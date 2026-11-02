@@ -35,24 +35,8 @@ pub fn load(path: &Path) -> Settings {
 }
 
 pub fn save(path: &Path, settings: &Settings) -> std::io::Result<()> {
-    use std::io::Write;
-    use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
-
-    if let Some(dir) = path.parent() {
-        std::fs::DirBuilder::new()
-            .recursive(true)
-            .mode(0o700)
-            .create(dir)?;
-    }
     let text = toml::to_string(settings).expect("settings are representable in TOML");
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .mode(0o600)
-        .open(path)?;
-    file.write_all(text.as_bytes())?;
-    std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600))
+    tunnelbar_core::store::write_private(path, &text)
 }
 
 /// Locale to display: the chosen one when available, else the system's.
@@ -97,6 +81,32 @@ mod tests {
         assert_eq!(load(&path), settings);
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
+    }
+
+    #[test]
+    fn saving_replaces_the_file_instead_of_rewriting_it() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("settings.toml");
+        save(&path, &Settings::default()).unwrap();
+        let before = std::fs::read_to_string(&path).unwrap();
+        // A hard link keeps the old file: an in-place rewrite would change it too.
+        let witness = dir.path().join("witness");
+        std::fs::hard_link(&path, &witness).unwrap();
+
+        save(
+            &path,
+            &Settings {
+                language: "fr".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(std::fs::read_to_string(&witness).unwrap(), before);
+        assert_eq!(load(&path).language, "fr");
+        let names: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(names.len(), 2, "no temporary file left: {names:?}");
     }
 
     #[test]

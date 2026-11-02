@@ -59,26 +59,8 @@ impl PidRegistry {
 
     /// Best effort: losing the file only means orphans may survive a crash.
     fn write(&self, pids: &BTreeSet<u32>) {
-        use std::io::Write;
-        use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
-
         let text: String = pids.iter().map(|pid| format!("{pid}\n")).collect();
-        let result = (|| {
-            if let Some(dir) = self.path.parent() {
-                std::fs::DirBuilder::new()
-                    .recursive(true)
-                    .mode(0o700)
-                    .create(dir)?;
-            }
-            std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .mode(0o600)
-                .open(&self.path)?
-                .write_all(text.as_bytes())
-        })();
-        if let Err(error) = result {
+        if let Err(error) = crate::store::write_private(&self.path, &text) {
             log::warn!("cannot write {}: {error}", self.path.display());
         }
     }
@@ -162,6 +144,17 @@ mod tests {
         assert_eq!(mode, 0o600);
         // Another run reads the same file.
         assert_eq!(PidRegistry::new(&path).previous(), vec![7]);
+    }
+
+    #[test]
+    fn the_file_is_replaced_atomically() {
+        let (dir, registry) = registry();
+        registry.record(1);
+        let path = dir.path().join("TunnelBar").join("ssh.pids");
+        let witness = dir.path().join("witness");
+        std::fs::hard_link(&path, &witness).unwrap();
+        registry.record(2);
+        assert_eq!(PidRegistry::new(&witness).previous(), vec![1]);
     }
 
     #[test]

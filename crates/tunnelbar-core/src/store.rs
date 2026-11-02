@@ -59,31 +59,33 @@ impl FileConfigStore {
             message: error.to_string(),
         }
     }
+}
 
-    /// Writes next to the target then renames, so that a crash never leaves a truncated file.
-    fn write_atomically(&self, text: &str) -> io::Result<()> {
-        let dir = self.path.parent().unwrap_or(Path::new("."));
-        DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
+/// Writes `text` to `path`, readable by the user only (0600, directory 0700 when created).
+/// The text goes to a temporary file which then replaces `path`, so that a crash never
+/// leaves a truncated file.
+pub fn write_private(path: &Path, text: &str) -> io::Result<()> {
+    let dir = path.parent().unwrap_or(Path::new("."));
+    DirBuilder::new().recursive(true).mode(0o700).create(dir)?;
 
-        let file_name = self.path.file_name().unwrap_or_default().to_string_lossy();
-        let temporary = dir.join(format!(".{file_name}.tmp"));
-        let result = (|| {
-            let _ = fs::remove_file(&temporary);
-            let mut file = OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .mode(0o600)
-                .open(&temporary)?;
-            file.write_all(text.as_bytes())?;
-            file.sync_all()?;
-            fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))?;
-            fs::rename(&temporary, &self.path)
-        })();
-        if result.is_err() {
-            let _ = fs::remove_file(&temporary);
-        }
-        result
+    let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+    let temporary = dir.join(format!(".{file_name}.tmp"));
+    let result = (|| {
+        let _ = fs::remove_file(&temporary);
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&temporary)?;
+        file.write_all(text.as_bytes())?;
+        file.sync_all()?;
+        fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600))?;
+        fs::rename(&temporary, path)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
     }
+    result
 }
 
 impl ConfigStore for FileConfigStore {
@@ -100,8 +102,7 @@ impl ConfigStore for FileConfigStore {
 
     fn save(&self, config: &Config) -> Result<(), ConfigError> {
         validate(config).map_err(ConfigError::Invalid)?;
-        self.write_atomically(&config.to_toml())
-            .map_err(self.io_error(&self.path))
+        write_private(&self.path, &config.to_toml()).map_err(self.io_error(&self.path))
     }
 }
 

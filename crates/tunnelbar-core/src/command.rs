@@ -84,7 +84,8 @@ impl SshCommand {
 
 fn shell_quoted(word: &str) -> String {
     let plain = |c: char| c.is_ascii_alphanumeric() || "_-./:=@%+,".contains(c);
-    if !word.is_empty() && word.chars().all(plain) {
+    // zsh expands a leading `=` (command path) and `~` anywhere (extended globs).
+    if !word.is_empty() && !word.starts_with('=') && word.chars().all(plain) {
         word.to_owned()
     } else {
         format!("'{}'", word.replace('\'', r"'\''"))
@@ -254,6 +255,18 @@ mod tests {
         assert_eq!(
             command.to_shell_line(),
             r#"/usr/bin/ssh '$(reboot)' 'it'\''s' '[::1]' ''"#
+        );
+    }
+
+    #[test]
+    fn shell_line_quotes_words_that_zsh_would_expand() {
+        let command = SshCommand {
+            program: PathBuf::from("/usr/bin/ssh"),
+            args: vec!["=ls".into(), "~root".into(), "a=b".into(), "a~b".into()],
+        };
+        assert_eq!(
+            command.to_shell_line(),
+            "/usr/bin/ssh '=ls' '~root' a=b 'a~b'"
         );
     }
 
