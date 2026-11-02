@@ -7,6 +7,24 @@
 Une application de barre de menus macOS pour démarrer, arrêter et surveiller
 des tunnels SSH.
 
+TunnelBar vit à côté de l'heure. Un clic affiche vos tunnels et leur état ; un
+interrupteur démarre ou arrête chacun d'eux. Il les reconnecte après une mise en
+veille ou un changement de réseau, et vous dit en clair pourquoi l'un échoue.
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="docs/images/panel-list.png" width="300" alt="Liste des tunnels : deux actifs avec leur adresse locale et leur durée, un arrêté"><br><sub><b>Vos tunnels d'un coup d'œil</b><br>adresse locale, durée, un interrupteur chacun</sub></td>
+    <td align="center" valign="top"><img src="docs/images/panel-states.png" width="300" alt="Liste avec un tunnel en erreur et son explication, un en reconnexion et un en connexion"><br><sub><b>Chaque état est visible</b><br>les erreurs expliquées là où elles surviennent</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="docs/images/panel-detail.png" width="300" alt="Détail d'un tunnel actif avec son menu d'actions ouvert"><br><sub><b>Détail d'un tunnel</b><br>accès, sortie de ssh, menu d'actions</sub></td>
+    <td align="center" valign="top"><img src="docs/images/panel-form.png" width="300" alt="Formulaire de nouveau tunnel signalant un port local déjà utilisé par un autre tunnel"><br><sub><b>Une saisie guidée</b><br>conflits de port nommés, port libre suggéré</sub></td>
+  </tr>
+</table>
+
+<sub>Maquettes issues de la refonte de l'interface (données d'exemple) ; l'app
+suit aussi le thème clair de macOS.</sub>
+
 ## Fonctionnalités
 
 - Un clic dans la barre de menus pour démarrer ou arrêter un tunnel comme

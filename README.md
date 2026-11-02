@@ -6,6 +6,24 @@
 
 A macOS menu bar app to start, stop and monitor SSH tunnels.
 
+TunnelBar lives next to the clock. One click shows your tunnels and their state;
+one switch starts or stops each of them. It reconnects them after sleep or a
+network change, and tells you in plain words why one fails.
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="docs/images/panel-list.png" width="300" alt="List of tunnels: two active with their local address and uptime, one stopped"><br><sub><b>Your tunnels at a glance</b><br>local address, uptime, one switch each</sub></td>
+    <td align="center" valign="top"><img src="docs/images/panel-states.png" width="300" alt="List showing a failed tunnel with its explanation, a reconnecting one and a connecting one"><br><sub><b>Every state is visible</b><br>errors explained where they happen</sub></td>
+  </tr>
+  <tr>
+    <td align="center" valign="top"><img src="docs/images/panel-detail.png" width="300" alt="Detail of an active tunnel with its actions menu open"><br><sub><b>Tunnel detail</b><br>access, ssh output, actions menu</sub></td>
+    <td align="center" valign="top"><img src="docs/images/panel-form.png" width="300" alt="New tunnel form flagging a local port already used by another tunnel"><br><sub><b>Guided editing</b><br>port clashes named, a free port suggested</sub></td>
+  </tr>
+</table>
+
+<sub>Mock-ups from the interface redesign (French UI, sample data); the app also
+follows the macOS light theme.</sub>
+
 ## Features
 
 - One click in the menu bar to start or stop a tunnel such as
