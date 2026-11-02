@@ -39,7 +39,10 @@ pub enum ValidationErrorKind {
     /// The same local port is already listened on by another forward.
     LocalPortConflict {
         port: u16,
+        /// Location of the other forward, renamed so as not to clash with the error's own.
+        #[serde(rename = "other_tunnel")]
         tunnel: usize,
+        #[serde(rename = "other_forward")]
         forward: usize,
     },
 }

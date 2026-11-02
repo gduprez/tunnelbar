@@ -8,13 +8,13 @@ use tunnelbar_core::model::{CONFIG_VERSION, Config, Tunnel};
 use tunnelbar_core::process::{PortProber, ProcessSpawner};
 use tunnelbar_core::store::{ConfigError, ConfigStore};
 use tunnelbar_core::supervisor::TunnelStatus;
-use tunnelbar_core::validation::{ValidationError, validate};
+use tunnelbar_core::validation::{ValidationError, ValidationErrorKind, validate};
 
 use crate::config_view::ConfigProblem;
 use crate::i18n::{Translator, available_locales};
 use crate::login_item::{self, LoginItem};
 use crate::settings::{self, Settings};
-use crate::tray::is_running;
+use crate::tray::{PANEL_WIDTH, is_running, panel_height};
 use crate::{AppState, invalidate_tray, refresh_tray};
 
 /// A tunnel definition with its live status, as sent to the panel.
@@ -154,6 +154,18 @@ pub async fn set_language(
     Ok(view)
 }
 
+/// Sizes the panel to its content. The height is bounded here, whatever the webview sends.
+#[tauri::command]
+pub fn fit_panel(window: tauri::WebviewWindow, height: f64) -> Result<(), String> {
+    if window.label() != crate::PANEL {
+        return Err("only the panel can be resized".into());
+    }
+    let height = panel_height(height).ok_or("invalid height")?;
+    window
+        .set_size(tauri::LogicalSize::new(PANEL_WIDTH, height))
+        .map_err(|error| error.to_string())
+}
+
 #[tauri::command]
 pub fn get_login_item() -> LoginItem {
     login_item::status()
@@ -181,7 +193,25 @@ pub fn tunnel_errors(
         .err()
         .unwrap_or_default()
         .into_iter()
-        .filter(|error| error.tunnel == Some(index))
+        .filter_map(|error| match error.kind {
+            _ if error.tunnel == Some(index) => Some(error),
+            // A port clash is reported on its second occurrence, which may be another
+            // tunnel: turn it around so that the edited tunnel shows it.
+            ValidationErrorKind::LocalPortConflict {
+                port,
+                tunnel,
+                forward,
+            } if tunnel == index => Some(ValidationError {
+                tunnel: Some(index),
+                forward: Some(forward),
+                kind: ValidationErrorKind::LocalPortConflict {
+                    port,
+                    tunnel: error.tunnel?,
+                    forward: error.forward?,
+                },
+            }),
+            _ => None,
+        })
         .collect()
 }
 
@@ -420,6 +450,22 @@ mod tests {
             tunnel_errors(&current, sample("renamed", 1), Some("a")),
             vec![]
         );
+    }
+
+    #[test]
+    fn a_conflict_with_a_later_tunnel_is_reported_on_the_edited_one() {
+        let current = config_of(vec![sample("a", 1), sample("b", 2)]);
+        let errors = tunnel_errors(&current, sample("a", 2), Some("a"));
+        assert_eq!(errors.len(), 1, "{errors:?}");
+        assert_eq!((errors[0].tunnel, errors[0].forward), (Some(0), Some(0)));
+        assert!(matches!(
+            errors[0].kind,
+            tunnelbar_core::validation::ValidationErrorKind::LocalPortConflict {
+                port: 2,
+                tunnel: 1,
+                forward: 0
+            }
+        ));
     }
 
     #[test]

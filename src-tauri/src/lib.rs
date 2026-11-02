@@ -30,7 +30,7 @@ use i18n::{Translator, available_locales, detect_locale};
 use settings::{Settings, settings_path};
 use tray::{MenuAction, PanelAction, PanelToggle, Rect, TrayLook};
 
-const PANEL: &str = "panel";
+pub(crate) const PANEL: &str = "panel";
 const TRAY: &str = "main";
 
 pub type SystemManager = TunnelManager<SystemSpawner, TcpPortProber>;
@@ -84,6 +84,7 @@ pub fn run() {
             commands::set_language,
             commands::get_login_item,
             commands::set_login_item,
+            commands::fit_panel,
         ])
         .setup(|app| {
             // Menu bar only: no Dock icon, not listed in Cmd+Tab.

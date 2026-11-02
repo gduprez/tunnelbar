@@ -91,3 +91,20 @@ fn validation_errors_carry_their_location() {
         json!({ "tunnel": 1, "forward": 0, "code": "zero_port", "field": "local_port" })
     );
 }
+
+#[test]
+fn port_conflicts_name_the_other_forward_without_hiding_their_own_location() {
+    let error = ValidationError {
+        tunnel: Some(1),
+        forward: Some(2),
+        kind: ValidationErrorKind::LocalPortConflict {
+            port: 54321,
+            tunnel: 0,
+            forward: 3,
+        },
+    };
+    assert_eq!(
+        serde_json::to_string(&error).unwrap(),
+        r#"{"tunnel":1,"forward":2,"code":"local_port_conflict","port":54321,"other_tunnel":0,"other_forward":3}"#
+    );
+}

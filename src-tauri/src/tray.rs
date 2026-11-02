@@ -129,6 +129,19 @@ impl PanelToggle {
     }
 }
 
+/// Width of the panel, in logical pixels.
+pub const PANEL_WIDTH: f64 = 380.0;
+/// Bounds of the panel height: it follows its content between them.
+pub const PANEL_MIN_HEIGHT: f64 = 160.0;
+pub const PANEL_MAX_HEIGHT: f64 = 640.0;
+
+/// The panel height for a content height requested by the webview, or None if it is not a number.
+pub fn panel_height(requested: f64) -> Option<f64> {
+    requested
+        .is_finite()
+        .then(|| requested.ceil().clamp(PANEL_MIN_HEIGHT, PANEL_MAX_HEIGHT))
+}
+
 /// A rectangle in physical pixels.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Rect {
@@ -287,6 +300,20 @@ mod tests {
             toggle.on_icon_click(now + Duration::from_secs(5), false),
             PanelAction::Show
         );
+    }
+
+    #[test]
+    fn panel_height_follows_the_content_within_bounds() {
+        assert_eq!(panel_height(300.4), Some(301.0));
+        assert_eq!(panel_height(10.0), Some(PANEL_MIN_HEIGHT));
+        assert_eq!(panel_height(5000.0), Some(PANEL_MAX_HEIGHT));
+    }
+
+    #[test]
+    fn panel_height_rejects_values_that_are_not_numbers() {
+        assert_eq!(panel_height(f64::NAN), None);
+        assert_eq!(panel_height(f64::INFINITY), None);
+        assert_eq!(panel_height(f64::NEG_INFINITY), None);
     }
 
     const SCREEN: Rect = Rect {
