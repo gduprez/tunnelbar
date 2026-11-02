@@ -8,20 +8,21 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-  pull-requests: write
+permissions: {}
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       created: ${{ steps.release.outputs.release_created }}
       tag: ${{ steps.release.outputs.tag_name }}
       version: ${{ steps.release.outputs.version }}
     steps:
       - id: release
-        uses: googleapis/release-please-action@v4
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
@@ -30,20 +31,23 @@ jobs:
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
     runs-on: macos-latest
+    permissions:
+      contents: write
     env:
       VERSION: ${{ needs.release-please.outputs.version }}
       TAG: ${{ needs.release-please.outputs.tag }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version-file: .nvmrc
           cache: npm
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
+          toolchain: stable
           targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - run: npm ci
 
       # Developer ID signing and notarization turn on by adding these repository secrets;
@@ -57,10 +61,12 @@ jobs:
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          # A random delimiter: no secret line can end the value early.
+          delimiter="END_$(openssl rand -hex 16)"
           for name in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY \
                       APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
             if [ -n "${!name}" ]; then
-              { echo "$name<<EOF"; echo "${!name}"; echo "EOF"; } >> "$GITHUB_ENV"
+              { echo "$name<<$delimiter"; echo "${!name}"; echo "$delimiter"; } >> "$GITHUB_ENV"
             fi
           done
 
@@ -83,7 +89,12 @@ jobs:
             echo "HOMEBREW_TAP_TOKEN is not set: skipping the tap update."
             exit 0
           fi
-          git clone "https://x-access-token:${TAP_TOKEN}@github.com/gduprez/homebrew-tap.git" tap
+          # The token goes in a request header, never in the remote URL or .git/config.
+          encoded="$(printf 'x-access-token:%s' "$TAP_TOKEN" | base64 | tr -d '\n')"
+          echo "::add-mask::$encoded"
+          auth="AUTHORIZATION: basic $encoded"
+          git -c http.https://github.com/.extraheader="$auth" \
+            clone https://github.com/gduprez/homebrew-tap.git tap
           mkdir -p tap/Casks
           sed -e "s/{{VERSION}}/${VERSION}/" -e "s/{{SHA256}}/${SHA256}/" \
             packaging/homebrew/tunnelbar.rb.template > tap/Casks/tunnelbar.rb
@@ -92,4 +103,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Casks/tunnelbar.rb
           git commit -m "tunnelbar ${VERSION}"
-          git push
+          git -c http.https://github.com/.extraheader="$auth" push
