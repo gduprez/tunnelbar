@@ -4,3 +4,5 @@ src-tauri/target/
 src-tauri/gen/
 package-lock.json
 *.md
+# Written by release-please in its own format.
+.release-please-manifest.json
