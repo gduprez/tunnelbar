@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/gduprez/tunnelbar/compare/v0.1.1...v0.2.0) (2026-11-02)
+
+
+### Features
+
+* **ui:** redesigned panel — state-coloured cards, inline errors, actions menu, grouped form, panel fits its content ([950e8e8](https://github.com/gduprez/tunnelbar/commit/950e8e83f08acaffb58bb62fa649d8bd3dd63465))
+
+
+### Bug Fixes
+
+* report port clashes on the edited tunnel with their own location; bounded panel resize command ([7f7924b](https://github.com/gduprez/tunnelbar/commit/7f7924b1ed11bdb4f4e9f8ce67256b73b79c04e9))
+
 ## [0.1.1](https://github.com/gduprez/tunnelbar/compare/v0.1.0...v0.1.1) (2026-11-02)
 
 
