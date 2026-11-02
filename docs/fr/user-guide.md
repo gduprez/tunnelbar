@@ -59,7 +59,7 @@ Voir [Compiler depuis les sources](../../README.fr.md#compiler-depuis-les-source
 | Démarrer ou arrêter un tunnel | Clic droit sur l'icône, puis clic sur le tunnel. Ou son interrupteur dans le panneau. |
 | Ouvrir le panneau | Clic sur l'icône. |
 | Comprendre pourquoi un tunnel échoue | Ouvrez le panneau et cliquez sur le tunnel : l'erreur et les dernières lignes affichées par `ssh` y sont. |
-| Copier la commande `ssh` équivalente | Dans le détail du tunnel, **Copier la commande ssh**. |
+| Copier la commande `ssh` équivalente | Dans le détail du tunnel, **⋯ › Copier la commande ssh**. Modifier, Dupliquer et Supprimer sont dans le même menu. |
 | Quitter | Clic droit sur l'icône › **Quitter TunnelBar**. Tous les tunnels sont fermés. |
 
 ### L'icône

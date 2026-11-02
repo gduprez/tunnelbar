@@ -34,18 +34,25 @@
 <style>
   .banner {
     margin: 0 12px 8px;
-    padding: 8px 10px;
-    border-radius: 8px;
-    background: var(--danger-background);
-    color: var(--danger);
+    padding: 10px 12px;
+    border: 1px solid var(--error-border);
+    border-radius: 10px;
+    background: var(--error-soft);
+    font-size: 12px;
+    line-height: 1.45;
   }
 
   p,
   ul {
-    margin: 0 0 4px;
+    margin: 0 0 6px;
   }
 
   ul {
     padding-left: 18px;
+  }
+
+  button {
+    font-size: 12px;
+    font-weight: 500;
   }
 </style>

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Translate } from '../lib/format';
   import type { LoginItem, SettingsView } from '../lib/types';
+  import Toggle from './Toggle.svelte';
 
   let {
     settings,
@@ -20,6 +21,8 @@
     onopenconfig: () => void;
   } = $props();
 
+  const loginEnabled = $derived(loginItem === 'enabled' || loginItem === 'requires_approval');
+
   /** Each language named in itself, so that anyone can find theirs. */
   function nativeName(code: string): string {
     try {
@@ -31,80 +34,80 @@
 </script>
 
 <section class="settings">
-  <div>
-    <label class="check">
-      <input
-        type="checkbox"
-        checked={loginItem === 'enabled' || loginItem === 'requires_approval'}
-        disabled={loginItem === null || loginItem === 'unavailable'}
-        onchange={(event) => onloginitem((event.currentTarget as HTMLInputElement).checked)}
-      />
-      {t('settings.login')}
-    </label>
-    {#if loginItem === 'requires_approval'}
-      <p class="note">{t('settings.login_approval')}</p>
-    {:else if loginItem === 'unavailable'}
-      <p class="note">{t('settings.login_unavailable')}</p>
-    {/if}
+  <h2 class="section-title">{t('settings.general')}</h2>
+  <div class="group">
+    <div class="group-row">
+      <span id="setting-login" class="label">{t('settings.login')}</span>
+      {#if loginItem !== null && loginItem !== 'unavailable'}
+        <Toggle
+          checked={loginEnabled}
+          labelledby="setting-login"
+          onchange={() => onloginitem(!loginEnabled)}
+        />
+      {/if}
+    </div>
+    <div class="group-row">
+      <label for="setting-language" class="label">{t('settings.language')}</label>
+      <select
+        id="setting-language"
+        value={settings.language}
+        onchange={(event) => onlanguage((event.currentTarget as HTMLSelectElement).value)}
+      >
+        <option value="auto">{t('settings.language_auto')}</option>
+        {#each settings.available as code (code)}
+          <option value={code}>{nativeName(code)}</option>
+        {/each}
+      </select>
+    </div>
   </div>
+  {#if loginItem === 'requires_approval'}
+    <p class="note">{t('settings.login_approval')}</p>
+  {:else if loginItem === 'unavailable'}
+    <p class="note">{t('settings.login_unavailable')}</p>
+  {/if}
 
-  <label>
-    <span>{t('settings.language')}</span>
-    <select
-      value={settings.language}
-      onchange={(event) => onlanguage((event.currentTarget as HTMLSelectElement).value)}
-    >
-      <option value="auto">{t('settings.language_auto')}</option>
-      {#each settings.available as code (code)}
-        <option value={code}>{nativeName(code)}</option>
-      {/each}
-    </select>
-  </label>
-
-  <div>
-    <span class="label">{t('settings.config_file')}</span>
-    <p class="path">{configPath}</p>
-    <button type="button" onclick={onopenconfig}>{t('config.open_file')}</button>
+  <h2 class="section-title">{t('settings.config_file')}</h2>
+  <div class="group file">
+    <p class="mono path">{configPath}</p>
+    <button type="button" class="link" onclick={onopenconfig}>{t('config.open_file')}</button>
   </div>
 </section>
 
 <style>
   .settings {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    padding: 0 16px 16px;
+    padding-bottom: 16px;
   }
 
-  label {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+  .section-title:first-child {
+    margin-top: 4px;
   }
 
-  label > span,
   .label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--secondary-text);
+    flex: 1;
   }
 
-  label.check {
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
+  select {
+    flex: none;
+    width: 150px;
   }
 
   .note {
-    margin: 4px 0 0 22px;
-    font-size: 11px;
+    margin: 6px 16px 0;
+    font-size: 12px;
     color: var(--secondary-text);
   }
 
+  .file {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
   .path {
-    margin: 4px 0 8px;
-    font-family: ui-monospace, Menlo, monospace;
-    font-size: 11px;
+    margin: 0;
+    color: var(--secondary-text);
     word-break: break-all;
     user-select: text;
     -webkit-user-select: text;

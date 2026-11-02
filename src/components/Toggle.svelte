@@ -1,15 +1,30 @@
 <script lang="ts">
-  let { checked, label, onchange }: { checked: boolean; label: string; onchange: () => void } =
-    $props();
+  import type { Tone } from '../lib/view';
+
+  let {
+    checked,
+    label,
+    labelledby,
+    tone = 'pending',
+    onchange,
+  }: {
+    checked: boolean;
+    /** Accessible name; or `labelledby`, the id of a visible label. */
+    label?: string;
+    labelledby?: string;
+    tone?: Tone;
+    onchange: () => void;
+  } = $props();
 </script>
 
 <button
   type="button"
   role="switch"
-  class="toggle"
+  class="toggle {tone}"
   class:on={checked}
   aria-checked={checked}
   aria-label={label}
+  aria-labelledby={labelledby}
   title={label}
   onclick={(event) => {
     event.stopPropagation();
@@ -23,33 +38,39 @@
   .toggle {
     position: relative;
     flex: none;
-    width: 34px;
-    height: 20px;
+    width: 38px;
+    height: 22px;
     padding: 0;
-    border: none;
-    border-radius: 10px;
+    border-radius: 11px;
     background: var(--toggle-off);
-    cursor: pointer;
     transition: background 0.15s;
   }
 
-  .toggle.on {
+  .on {
     background: var(--accent);
+  }
+
+  .on.up {
+    background: var(--up);
+  }
+
+  .on.retry {
+    background: var(--retry);
   }
 
   .knob {
     position: absolute;
     top: 2px;
     left: 2px;
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: white;
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.35);
     transition: transform 0.15s;
   }
 
   .on .knob {
-    transform: translateX(14px);
+    transform: translateX(16px);
   }
 </style>

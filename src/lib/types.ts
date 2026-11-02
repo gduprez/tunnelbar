@@ -51,6 +51,9 @@ export interface ValidationError {
   port?: number;
   id?: string;
   found?: number;
+  /** For `local_port_conflict`: the forward already listening on the port. */
+  other_tunnel?: number;
+  other_forward?: number;
 }
 
 export type ConfigProblem =

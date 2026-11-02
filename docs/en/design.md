@@ -191,6 +191,8 @@ all up, at least one failed.
 
 **Panel** (left click), a popover anchored to the icon:
 
+- The panel takes the height of its content (160 to 640 px, bounded by the
+  Rust side); the list footer holds **New tunnel** and the settings.
 - Tunnel list: status dot, name, summary
   (`localhost:54321 → 127.0.0.1:5432 via 203.0.113.10`), toggle, and a menu
   (edit, duplicate, delete, copy equivalent `ssh` command).

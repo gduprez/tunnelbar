@@ -202,6 +202,8 @@ actif, tous actifs, au moins un en erreur.
 
 **Panneau** (clic gauche), ancré sous l'icône :
 
+- Le panneau prend la hauteur de son contenu (de 160 à 640 px, bornée côté
+  Rust) ; le pied de la liste porte **Nouveau tunnel** et les réglages.
 - Liste des tunnels : pastille d'état, nom, résumé
   (`localhost:54321 → 127.0.0.1:5432 via 203.0.113.10`), interrupteur et
   menu (modifier, dupliquer, supprimer, copier la commande `ssh` équivalente).

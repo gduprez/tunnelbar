@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
+  import ActionMenu from './components/ActionMenu.svelte';
   import ConfigBanner from './components/ConfigBanner.svelte';
   import Settings from './components/Settings.svelte';
   import TunnelDetail from './components/TunnelDetail.svelte';
@@ -18,6 +19,7 @@
     Tunnel,
     TunnelView,
   } from './lib/types';
+  import { listSummary } from './lib/view';
 
   let { locale }: { locale: string } = $props();
 
@@ -34,8 +36,14 @@
   let loginItem = $state<LoginItem | null>(null);
   let now = $state(Date.now());
   let notice = $state<string | null>(null);
+  let confirmingDelete = $state(false);
+
+  let header = $state<HTMLElement>();
+  let body = $state<HTMLElement>();
+  let footer = $state<HTMLElement>();
 
   const t = $derived(createTranslator(catalogs, settings?.locale ?? locale));
+  const summary = $derived(listSummary(t, tunnels));
   const shown = $derived.by(() => {
     if (view.name !== 'detail') return undefined;
     const id = view.id;
@@ -73,6 +81,38 @@
     };
   });
 
+  // The panel takes the height of its content; Rust bounds it.
+  $effect(() => {
+    if (!header || !body || typeof ResizeObserver === 'undefined') return;
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const height =
+          (header?.offsetHeight ?? 0) +
+          (body?.firstElementChild?.scrollHeight ?? 0) +
+          (footer?.offsetHeight ?? 0);
+        api.fitPanel(height).catch(() => {});
+      });
+    };
+    const observer = new ResizeObserver(fit);
+    for (const element of [header, body, body.firstElementChild, footer]) {
+      if (element) observer.observe(element);
+    }
+    fit();
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  });
+
+  async function go(next: View) {
+    confirmingDelete = false;
+    view = next;
+    await tick();
+    if (body) body.scrollTop = 0;
+  }
+
   function toggle(tunnel: TunnelView) {
     if (isRunning(tunnel.status.state)) api.stopTunnel(tunnel.id);
     else api.startTunnel(tunnel.id);
@@ -85,21 +125,21 @@
   }
 
   function edit(tunnel: TunnelView) {
-    view = { name: 'edit', form: fromTunnel(tunnel), previousId: tunnel.id };
+    go({ name: 'edit', form: fromTunnel(tunnel), previousId: tunnel.id });
   }
 
   function duplicate(tunnel: TunnelView) {
     const form = fromTunnel(tunnel);
     form.id = '';
     form.name = t('form.copy_of', { name: tunnel.name });
-    view = { name: 'edit', form, previousId: null };
+    go({ name: 'edit', form, previousId: null });
   }
 
   async function remove(tunnel: TunnelView) {
     try {
       await api.deleteTunnel(tunnel.id);
       await refresh();
-      view = { name: 'list' };
+      go({ name: 'list' });
     } catch (problem) {
       config = { path: config?.path ?? '', problem: problem as ConfigProblem };
     }
@@ -107,7 +147,7 @@
 
   async function saved(tunnel: Tunnel) {
     await refresh();
-    view = { name: 'detail', id: tunnel.id };
+    go({ name: 'detail', id: tunnel.id });
   }
 
   async function chooseLoginItem(enabled: boolean) {
@@ -124,93 +164,160 @@
   }
 
   function back() {
-    view =
+    go(
       view.name === 'edit' && view.previousId
         ? { name: 'detail', id: view.previousId }
-        : { name: 'list' };
+        : { name: 'list' },
+    );
   }
 </script>
 
 <main>
-  <header>
+  <header bind:this={header}>
     {#if view.name !== 'list'}
       <button
         type="button"
         class="icon"
         aria-label={t('common.back')}
         title={t('common.back')}
-        onclick={back}>‹</button
+        onclick={back}
       >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"><path d="M10 3 5 8l5 5" /></svg
+        >
+      </button>
     {/if}
     <h1>{title}</h1>
-    {#if view.name === 'list'}
+    {#if view.name === 'list' && summary.text}
+      <p class="summary" class:alert={summary.alert}>{summary.text}</p>
+    {/if}
+    {#if view.name === 'detail' && shown}
+      {@const tunnel = shown}
+      <ActionMenu
+        label={t('menu.more')}
+        items={[
+          { label: t('menu.edit'), onselect: () => edit(tunnel) },
+          { label: t('common.duplicate'), onselect: () => duplicate(tunnel) },
+          {
+            label: t('actions.copy_command'),
+            onselect: async () => copy(await api.shellCommand(tunnel.id)),
+          },
+          {
+            label: t('menu.delete'),
+            danger: true,
+            separatorBefore: true,
+            onselect: () => (confirmingDelete = true),
+          },
+        ]}
+      />
+    {/if}
+  </header>
+
+  <div class="body" bind:this={body}>
+    <div>
+      {#if config?.problem && view.name !== 'edit'}
+        <ConfigBanner problem={config.problem} {t} onopen={() => api.openConfig()} />
+      {/if}
+
+      {#if view.name === 'list'}
+        <TunnelList
+          {tunnels}
+          {t}
+          {now}
+          ontoggle={toggle}
+          onopen={(tunnel) => go({ name: 'detail', id: tunnel.id })}
+          onadd={() => go({ name: 'edit', form: emptyForm(), previousId: null })}
+        />
+      {:else if view.name === 'detail' && shown}
+        {@const tunnel = shown}
+        <TunnelDetail
+          {tunnel}
+          {t}
+          {now}
+          {confirmingDelete}
+          ontoggle={() => toggle(tunnel)}
+          ondelete={() => remove(tunnel)}
+          oncanceldelete={() => (confirmingDelete = false)}
+          oncopylogs={() => copy(tunnel.status.logs.join('\n'))}
+        />
+      {:else if view.name === 'edit'}
+        {#key view}
+          <TunnelEditor
+            initial={view.form}
+            previousId={view.previousId}
+            {tunnels}
+            {t}
+            validate={api.validateTunnel}
+            save={api.saveTunnel}
+            oncancel={back}
+            onsaved={saved}
+          />
+        {/key}
+      {:else if view.name === 'settings' && settings}
+        <Settings
+          {settings}
+          {loginItem}
+          configPath={config?.path ?? ''}
+          {t}
+          onlanguage={chooseLanguage}
+          onloginitem={chooseLoginItem}
+          onopenconfig={() => api.openConfig()}
+        />
+      {/if}
+    </div>
+  </div>
+
+  {#if view.name === 'list'}
+    <footer bind:this={footer}>
       <button
         type="button"
-        class="icon"
-        aria-label={t('panel.add')}
-        title={t('panel.add')}
-        onclick={() => (view = { name: 'edit', form: emptyForm(), previousId: null })}>+</button
+        class="link new"
+        onclick={() => go({ name: 'edit', form: emptyForm(), previousId: null })}
       >
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 14 14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          aria-hidden="true"><path d="M7 2v10M2 7h10" /></svg
+        >
+        {t('panel.new')}
+      </button>
       <button
         type="button"
         class="icon"
         aria-label={t('panel.settings')}
         title={t('panel.settings')}
-        onclick={() => (view = { name: 'settings' })}>⚙</button
+        onclick={() => go({ name: 'settings' })}
       >
-    {/if}
-  </header>
-
-  {#if config?.problem && view.name !== 'edit'}
-    <ConfigBanner problem={config.problem} {t} onopen={() => api.openConfig()} />
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.8"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          ><circle cx="12" cy="12" r="3" /><path
+            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+          /></svg
+        >
+      </button>
+    </footer>
   {/if}
-
-  <div class="content">
-    {#if view.name === 'list'}
-      <TunnelList
-        {tunnels}
-        {t}
-        ontoggle={toggle}
-        onopen={(tunnel) => (view = { name: 'detail', id: tunnel.id })}
-        onadd={() => (view = { name: 'edit', form: emptyForm(), previousId: null })}
-      />
-    {:else if view.name === 'detail' && shown}
-      {@const tunnel = shown}
-      <TunnelDetail
-        {tunnel}
-        {t}
-        {now}
-        ontoggle={() => toggle(tunnel)}
-        onedit={() => edit(tunnel)}
-        onduplicate={() => duplicate(tunnel)}
-        ondelete={() => remove(tunnel)}
-        oncopycommand={async () => copy(await api.shellCommand(tunnel.id))}
-        oncopylogs={() => copy(tunnel.status.logs.join('\n'))}
-      />
-    {:else if view.name === 'edit'}
-      {#key view}
-        <TunnelEditor
-          initial={view.form}
-          previousId={view.previousId}
-          {t}
-          validate={api.validateTunnel}
-          save={api.saveTunnel}
-          oncancel={back}
-          onsaved={saved}
-        />
-      {/key}
-    {:else if view.name === 'settings' && settings}
-      <Settings
-        {settings}
-        {loginItem}
-        configPath={config?.path ?? ''}
-        {t}
-        onlanguage={chooseLanguage}
-        onloginitem={chooseLoginItem}
-        onopenconfig={() => api.openConfig()}
-      />
-    {/if}
-  </div>
 
   {#if notice}
     <div class="notice" role="status">{notice}</div>
@@ -226,9 +333,15 @@
 
   header {
     display: flex;
+    flex: none;
     align-items: center;
     gap: 4px;
-    padding: 12px 10px 8px 16px;
+    min-height: 36px;
+    padding: 12px 8px 8px 16px;
+  }
+
+  header:has(> button:first-child) {
+    padding-left: 8px;
   }
 
   h1 {
@@ -236,14 +349,44 @@
     margin: 0;
     font-size: 15px;
     font-weight: 600;
+    letter-spacing: -0.01em;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .content {
+  .summary {
+    margin: 0 8px 0 0;
+    font-size: 12px;
+    color: var(--secondary-text);
+  }
+
+  .summary.alert {
+    color: var(--error-text);
+  }
+
+  .body {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
+  }
+
+  footer {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-top: 1px solid var(--separator);
+  }
+
+  .new {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    padding: 0 10px;
+    font-weight: 500;
   }
 
   .notice {

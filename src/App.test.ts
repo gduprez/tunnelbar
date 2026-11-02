@@ -30,6 +30,7 @@ vi.mock('./lib/api', () => ({
       return () => {};
     }),
     copy: vi.fn(async () => {}),
+    fitPanel: vi.fn(async () => {}),
     loginItem: vi.fn(async () => 'disabled'),
     setLoginItem: vi.fn(async (enabled: boolean) => (enabled ? 'enabled' : 'disabled')),
   },
@@ -96,7 +97,8 @@ describe('App', () => {
       reconnections: 0,
       logs: [],
     });
-    await waitFor(() => expect(screen.getByText('Error')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Authentication refused')).toBeInTheDocument());
+    expect(screen.getByText('Needs attention: 1')).toBeInTheDocument();
     expect(toggle).toHaveAttribute('aria-checked', 'false');
   });
 
@@ -106,23 +108,27 @@ describe('App', () => {
     vi.mocked(api.listTunnels).mockResolvedValue([failed]);
     render(App, { locale: 'en' });
 
-    await fireEvent.click(await screen.findByText('PostgreSQL prod'));
+    expect(await screen.findByText(/Local port 54321 is already used/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole('button', { name: 'See the ssh output' }));
     expect(screen.getByRole('alert')).toHaveTextContent('Local port 54321 is already used');
     expect(screen.getByText('bind [127.0.0.1]:54321: Address already in use')).toBeInTheDocument();
-    expect(screen.getByText('localhost:54321 → 127.0.0.1:5432')).toBeInTheDocument();
+    expect(screen.getByText('localhost:54321')).toBeInTheDocument();
+    expect(screen.getByText('127.0.0.1:5432')).toBeInTheDocument();
   });
 
   it('copies the equivalent ssh command', async () => {
     render(App, { locale: 'en' });
     await fireEvent.click(await screen.findByText('PostgreSQL prod'));
-    await fireEvent.click(screen.getByRole('button', { name: 'Copy ssh command' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: 'Copy ssh command' }));
     await waitFor(() => expect(api.copy).toHaveBeenCalledWith('/usr/bin/ssh -N -- host'));
   });
 
   it('deletes a tunnel after confirmation', async () => {
     render(App, { locale: 'en' });
     await fireEvent.click(await screen.findByText('PostgreSQL prod'));
-    await fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: 'Delete…' }));
     expect(api.deleteTunnel).not.toHaveBeenCalled();
     expect(
       screen.getByText('Delete “PostgreSQL prod”? This cannot be undone.'),
@@ -133,11 +139,18 @@ describe('App', () => {
 
   it('creates a tunnel with an id derived from its name', async () => {
     render(App, { locale: 'en' });
-    await fireEvent.click(await screen.findByRole('button', { name: 'Add a tunnel' }));
+    await fireEvent.click(await screen.findByRole('button', { name: 'New tunnel' }));
     await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Redis staging' } });
     await fireEvent.input(screen.getByLabelText('Server'), { target: { value: 'staging' } });
-    await fireEvent.input(screen.getByLabelText('Local port'), { target: { value: '63790' } });
-    await fireEvent.input(screen.getByLabelText('Remote port'), { target: { value: '6379' } });
+    await fireEvent.input(screen.getByLabelText('Port on this Mac'), {
+      target: { value: '63790' },
+    });
+    await fireEvent.input(
+      screen.getByLabelText('Port', { exact: true, selector: '#remote-port-0' }),
+      {
+        target: { value: '6379' },
+      },
+    );
     await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() => expect(api.saveTunnel).toHaveBeenCalled());
@@ -162,7 +175,7 @@ describe('App', () => {
       { tunnel: 1, forward: null, code: 'invalid_host' },
     ]);
     render(App, { locale: 'en' });
-    await fireEvent.click(await screen.findByRole('button', { name: 'Add a tunnel' }));
+    await fireEvent.click(await screen.findByRole('button', { name: 'New tunnel' }));
     await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(
@@ -174,7 +187,8 @@ describe('App', () => {
   it('edits a tunnel in place', async () => {
     render(App, { locale: 'en' });
     await fireEvent.click(await screen.findByText('PostgreSQL prod'));
-    await fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+    await fireEvent.click(screen.getByRole('menuitem', { name: 'Edit…' }));
     await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Prod DB' } });
     await fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
@@ -227,5 +241,44 @@ describe('App', () => {
     render(App, { locale: 'en' });
     await fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
     expect(await screen.findByText(/System Settings › General › Login Items/)).toBeInTheDocument();
+  });
+
+  it('summarises running tunnels in the header', async () => {
+    vi.mocked(api.listTunnels).mockResolvedValue([view({ state: 'up' }), { ...view(), id: 'b' }]);
+    render(App, { locale: 'en' });
+    expect(await screen.findByText('1 of 2 running')).toBeInTheDocument();
+  });
+
+  it('closes the actions menu with Escape and gives the focus back', async () => {
+    render(App, { locale: 'en' });
+    await fireEvent.click(await screen.findByText('PostgreSQL prod'));
+    const trigger = screen.getByRole('button', { name: 'More actions' });
+    await fireEvent.click(trigger);
+    const menu = screen.getByRole('menu');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    await fireEvent.keyDown(menu, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
+  it('names the other tunnel of a port clash and suggests a free port', async () => {
+    vi.mocked(api.listTunnels).mockResolvedValue([view()]);
+    vi.mocked(api.validateTunnel).mockResolvedValue([
+      {
+        tunnel: 1,
+        forward: 0,
+        code: 'local_port_conflict',
+        port: 54321,
+        other_tunnel: 0,
+        other_forward: 0,
+      },
+    ]);
+    render(App, { locale: 'en' });
+    await fireEvent.click(await screen.findByRole('button', { name: 'New tunnel' }));
+    await fireEvent.input(screen.getByLabelText('Name'), { target: { value: 'Other' } });
+    expect(
+      await screen.findByText('Port 54321 is already used by “PostgreSQL prod”. Try 54322.'),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText('Port on this Mac')).toHaveAttribute('aria-invalid', 'true');
   });
 });

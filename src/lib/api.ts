@@ -34,6 +34,8 @@ export const api = {
   onTunnelsChanged: (callback: () => void): Promise<UnlistenFn> =>
     listen('tunnels-changed', () => callback()),
   copy: (text: string) => navigator.clipboard.writeText(text),
+  /** Resizes the panel to its content; the Rust side bounds the height. */
+  fitPanel: (height: number) => invoke<void>('fit_panel', { height }),
   loginItem: () => invoke<LoginItem>('get_login_item'),
   setLoginItem: (enabled: boolean) => invoke<LoginItem>('set_login_item', { enabled }),
 };

@@ -59,7 +59,7 @@ See [Building from source](../../README.md#building-from-source).
 | Start or stop a tunnel | Right-click the icon, then click the tunnel. Or use its switch in the panel. |
 | Open the panel | Click the icon. |
 | See why a tunnel fails | Open the panel and click the tunnel: the error and the last lines printed by `ssh` are shown. |
-| Copy the equivalent `ssh` command | In the tunnel detail, **Copy ssh command**. |
+| Copy the equivalent `ssh` command | In the tunnel detail, **⋯ › Copy ssh command**. Edit, Duplicate and Delete are in the same menu. |
 | Quit | Right-click the icon › **Quit TunnelBar**. Every tunnel is closed. |
 
 ### The icon

@@ -1,24 +1,21 @@
 <script lang="ts">
-  import {
-    forwardSummary,
-    isRunning,
-    stateText,
-    tunnelTarget,
-    type Translate,
-  } from '../lib/format';
+  import { errorMessage, isRunning, type Translate } from '../lib/format';
   import type { TunnelView } from '../lib/types';
+  import { rowSubtitle, stateTone } from '../lib/view';
   import StatusDot from './StatusDot.svelte';
   import Toggle from './Toggle.svelte';
 
   let {
     tunnels,
     t,
+    now,
     ontoggle,
     onopen,
     onadd,
   }: {
     tunnels: TunnelView[];
     t: Translate;
+    now: number;
     ontoggle: (tunnel: TunnelView) => void;
     onopen: (tunnel: TunnelView) => void;
     onadd: () => void;
@@ -33,32 +30,30 @@
 {:else}
   <ul class="list">
     {#each tunnels as tunnel (tunnel.id)}
-      <li>
-        <div
-          class="row"
-          role="button"
-          tabindex="0"
-          onclick={() => onopen(tunnel)}
-          onkeydown={(event) => event.key === 'Enter' && onopen(tunnel)}
-        >
-          <StatusDot state={tunnel.status.state} />
-          <div class="text">
-            <div class="name">{tunnel.name}</div>
-            <div class="summary">
-              {#if tunnel.status.state.state === 'stopped' || tunnel.status.state.state === 'up'}
-                {tunnel.forward[0] ? forwardSummary(tunnel.forward[0]) : ''}
-                {t('detail.via', { target: tunnelTarget(tunnel) })}
-              {:else}
-                {stateText(t, tunnel.status.state)}
-              {/if}
-            </div>
-          </div>
+      {@const tone = stateTone(tunnel.status.state)}
+      {@const state = tunnel.status.state}
+      <li class="card {tone}">
+        <div class="row">
+          <button type="button" class="open" onclick={() => onopen(tunnel)}>
+            <StatusDot {tone} />
+            <span class="text">
+              <span class="name">{tunnel.name}</span>
+              <span class="subtitle {tone}">{rowSubtitle(t, tunnel, now)}</span>
+            </span>
+          </button>
           <Toggle
-            checked={isRunning(tunnel.status.state)}
+            checked={isRunning(state)}
+            {tone}
             label={t('toggle.label', { name: tunnel.name })}
             onchange={() => ontoggle(tunnel)}
           />
         </div>
+        {#if state.state === 'failed'}
+          <p class="explanation">{errorMessage(t, state.error)}</p>
+          <button type="button" class="link details" onclick={() => onopen(tunnel)}>
+            {t('list.see_output')}
+          </button>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -66,28 +61,53 @@
 
 <style>
   .list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     margin: 0;
-    padding: 0 6px;
+    padding: 0 8px 8px;
     list-style: none;
+  }
+
+  .card {
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background: var(--surface);
+  }
+
+  .card.off {
+    background: none;
+  }
+
+  .card.error {
+    border-color: var(--error-border);
+    background: var(--error-soft);
   }
 
   .row {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px;
-    border-radius: 8px;
-    cursor: pointer;
+    gap: 8px;
+    padding-right: 10px;
   }
 
-  .row:hover,
-  .row:focus-visible {
-    background: var(--hover);
-    outline: none;
+  .open {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    height: auto;
+    padding: 10px 0 10px 12px;
+    background: none;
+    font-weight: normal;
+    text-align: left;
   }
 
   .text {
-    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     min-width: 0;
   }
 
@@ -98,17 +118,45 @@
     white-space: nowrap;
   }
 
-  .summary {
+  .off .name {
     color: var(--secondary-text);
-    font-size: 11px;
+  }
+
+  .subtitle {
+    font-size: 12px;
+    color: var(--secondary-text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
+  .subtitle.retry {
+    color: var(--retry-text);
+  }
+
+  .subtitle.error {
+    color: var(--error-text);
+  }
+
+  .explanation {
+    margin: -2px 12px 6px 32px;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .details {
+    margin: 0 12px 10px 32px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
   .empty {
-    padding: 32px 16px;
+    padding: 28px 16px 32px;
     text-align: center;
     color: var(--secondary-text);
+  }
+
+  .empty p {
+    margin: 0 0 12px;
   }
 </style>
