@@ -173,11 +173,13 @@ async fn running_processes_are_recorded_for_orphan_cleanup() {
 
     manager.start("prod").unwrap();
     until(&manager, |s| s.state == TunnelState::Up).await;
-    assert_eq!(registry.previous().len(), 1);
+    let previous = registry.previous();
+    assert_eq!(previous.len(), 1);
+    assert!(previous[0].1.is_some(), "start time recorded: {previous:?}");
 
     manager.stop("prod").unwrap();
     until(&manager, |s| s.state == TunnelState::Stopped).await;
-    assert_eq!(registry.previous(), Vec::<u32>::new());
+    assert_eq!(registry.previous(), vec![]);
     manager.shutdown().await;
 }
 
@@ -195,6 +197,6 @@ async fn exited_processes_are_forgotten() {
 
     manager.start("prod").unwrap();
     until(&manager, |s| matches!(s.state, TunnelState::Failed { .. })).await;
-    assert_eq!(registry.previous(), Vec::<u32>::new());
+    assert_eq!(registry.previous(), vec![]);
     manager.shutdown().await;
 }

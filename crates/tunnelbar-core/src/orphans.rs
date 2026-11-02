@@ -1,21 +1,31 @@
 //! Cleans up `ssh` processes left behind by a TunnelBar that crashed or was killed.
 //!
-//! The PIDs of running tunnels are recorded in a file. At the next start, a recorded process is
-//! killed only if it was orphaned (its parent is now launchd) and still looks like a TunnelBar
-//! `ssh`, so that a recycled PID never hits an unrelated process.
+//! The PIDs of running tunnels are recorded in a file with the start time of each process.
+//! At the next start, a recorded process is killed only if it was orphaned (its parent is now
+//! launchd), still looks like a TunnelBar `ssh`, and started at the recorded time: a PID that
+//! macOS recycled for another process is never hit.
 
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
 /// Start of the command line of every `ssh` run by TunnelBar.
 pub const SSH_SIGNATURE: &str = "/usr/bin/ssh -N -o ExitOnForwardFailure=yes";
 
-/// Persistent set of the PIDs of running tunnel processes.
+/// What `ps` tells about a running process.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessInfo {
+    pub ppid: u32,
+    /// Start time as printed by `ps -o lstart=`, e.g. `Mon Nov  2 11:16:03 2026`.
+    pub started: String,
+    pub command: String,
+}
+
+/// Persistent PIDs of running tunnel processes, with their start time when known.
 #[derive(Debug)]
 pub struct PidRegistry {
     path: PathBuf,
-    pids: Mutex<BTreeSet<u32>>,
+    entries: Mutex<BTreeMap<u32, Option<String>>>,
 }
 
 impl PidRegistry {
@@ -23,43 +33,55 @@ impl PidRegistry {
     pub fn new(path: impl Into<PathBuf>) -> Self {
         PidRegistry {
             path: path.into(),
-            pids: Mutex::new(BTreeSet::new()),
+            entries: Mutex::new(BTreeMap::new()),
         }
     }
 
-    pub fn record(&self, pid: u32) {
-        let mut pids = self.lock();
-        pids.insert(pid);
-        self.write(&pids);
+    pub fn record(&self, pid: u32, started: Option<String>) {
+        let mut entries = self.lock();
+        entries.insert(pid, started);
+        self.write(&entries);
     }
 
     pub fn forget(&self, pid: u32) {
-        let mut pids = self.lock();
-        if pids.remove(&pid) {
-            self.write(&pids);
+        let mut entries = self.lock();
+        if entries.remove(&pid).is_some() {
+            self.write(&entries);
         }
     }
 
-    /// PIDs currently in the file.
-    pub fn previous(&self) -> Vec<u32> {
+    /// Entries currently in the file, by PID. Lines are `pid` or `pid<TAB>start time`.
+    pub fn previous(&self) -> Vec<(u32, Option<String>)> {
         std::fs::read_to_string(&self.path)
             .unwrap_or_default()
             .lines()
-            .filter_map(|line| line.trim().parse().ok())
-            .collect::<BTreeSet<u32>>()
+            .filter_map(|line| {
+                let (pid, started) = match line.split_once('\t') {
+                    Some((pid, started)) => (pid, Some(started.to_owned())),
+                    None => (line, None),
+                };
+                Some((pid.trim().parse().ok()?, started))
+            })
+            .collect::<BTreeMap<u32, Option<String>>>()
             .into_iter()
             .collect()
     }
 
-    fn lock(&self) -> std::sync::MutexGuard<'_, BTreeSet<u32>> {
-        self.pids
+    fn lock(&self) -> std::sync::MutexGuard<'_, BTreeMap<u32, Option<String>>> {
+        self.entries
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
 
     /// Best effort: losing the file only means orphans may survive a crash.
-    fn write(&self, pids: &BTreeSet<u32>) {
-        let text: String = pids.iter().map(|pid| format!("{pid}\n")).collect();
+    fn write(&self, entries: &BTreeMap<u32, Option<String>>) {
+        let text: String = entries
+            .iter()
+            .map(|(pid, started)| match started {
+                Some(started) => format!("{pid}\t{started}\n"),
+                None => format!("{pid}\n"),
+            })
+            .collect();
         if let Err(error) = crate::store::write_private(&self.path, &text) {
             log::warn!("cannot write {}: {error}", self.path.display());
         }
@@ -67,30 +89,45 @@ impl PidRegistry {
 }
 
 pub trait ProcessInspector {
-    /// Parent PID and command line of a running process, if it exists.
-    fn describe(&self, pid: u32) -> Option<(u32, String)>;
+    /// What is known of a running process, if it exists.
+    fn describe(&self, pid: u32) -> Option<ProcessInfo>;
     fn terminate(&self, pid: u32);
 }
 
-/// Inspects processes with `ps` and terminates them with `kill`.
+/// Inspects processes with `ps` and signals them with `kill(2)`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct SystemInspector;
 
 impl ProcessInspector for SystemInspector {
-    fn describe(&self, pid: u32) -> Option<(u32, String)> {
+    fn describe(&self, pid: u32) -> Option<ProcessInfo> {
         let output = std::process::Command::new("/bin/ps")
-            .args(["-o", "ppid=,command=", "-p", &pid.to_string()])
+            .args(["-o", "ppid=,lstart=,command=", "-p", &pid.to_string()])
+            // A fixed, English start time format of 24 characters.
+            .env("LC_ALL", "C")
             .output()
             .ok()?;
         let text = String::from_utf8_lossy(&output.stdout);
-        let (ppid, command) = text.trim().split_once(char::is_whitespace)?;
-        Some((ppid.parse().ok()?, command.trim().to_owned()))
+        let (ppid, rest) = text.trim_start().split_once(char::is_whitespace)?;
+        let rest = rest.trim_start();
+        let started = rest.get(..24)?;
+        Some(ProcessInfo {
+            ppid: ppid.parse().ok()?,
+            started: started.to_owned(),
+            command: rest.get(24..)?.trim().to_owned(),
+        })
     }
 
     fn terminate(&self, pid: u32) {
-        let _ = std::process::Command::new("/bin/kill")
-            .args(["-TERM", &pid.to_string()])
-            .status();
+        use nix::sys::signal::{Signal, kill};
+        use nix::unistd::Pid;
+
+        // 0 and 1 would signal a process group or launchd, never a tunnel.
+        match i32::try_from(pid) {
+            Ok(pid) if pid > 1 => {
+                let _ = kill(Pid::from_raw(pid), Signal::SIGTERM);
+            }
+            _ => {}
+        }
     }
 }
 
@@ -103,11 +140,16 @@ pub fn clean_orphans(
     let killed: Vec<u32> = registry
         .previous()
         .into_iter()
-        .filter(|pid| {
-            inspector
-                .describe(*pid)
-                .is_some_and(|(ppid, command)| ppid == 1 && command.starts_with(signature))
+        .filter(|(pid, recorded)| {
+            inspector.describe(*pid).is_some_and(|info| {
+                info.ppid == 1
+                    && info.command.starts_with(signature)
+                    && recorded
+                        .as_ref()
+                        .is_none_or(|started| *started == info.started)
+            })
         })
+        .map(|(pid, _)| pid)
         .collect();
     for pid in &killed {
         inspector.terminate(*pid);
@@ -123,57 +165,77 @@ mod tests {
     use std::collections::HashMap;
     use std::os::unix::fs::PermissionsExt;
 
+    const STARTED: &str = "Mon Nov  2 11:16:03 2026";
+
     fn registry() -> (tempfile::TempDir, PidRegistry) {
         let dir = tempfile::tempdir().unwrap();
         let registry = PidRegistry::new(dir.path().join("TunnelBar").join("ssh.pids"));
         (dir, registry)
     }
 
+    fn started(text: &str) -> Option<String> {
+        Some(text.to_owned())
+    }
+
     #[test]
     fn records_and_forgets_pids_in_a_private_file() {
         let (dir, registry) = registry();
-        assert_eq!(registry.previous(), Vec::<u32>::new());
-        registry.record(42);
-        registry.record(7);
-        assert_eq!(registry.previous(), vec![7, 42]);
+        assert_eq!(registry.previous(), vec![]);
+        registry.record(42, started(STARTED));
+        registry.record(7, None);
+        assert_eq!(registry.previous(), vec![(7, None), (42, started(STARTED))]);
         registry.forget(42);
-        assert_eq!(registry.previous(), vec![7]);
+        assert_eq!(registry.previous(), vec![(7, None)]);
 
         let path = dir.path().join("TunnelBar").join("ssh.pids");
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
         // Another run reads the same file.
-        assert_eq!(PidRegistry::new(&path).previous(), vec![7]);
+        assert_eq!(PidRegistry::new(&path).previous(), vec![(7, None)]);
     }
 
     #[test]
     fn the_file_is_replaced_atomically() {
         let (dir, registry) = registry();
-        registry.record(1);
+        registry.record(1, None);
         let path = dir.path().join("TunnelBar").join("ssh.pids");
         let witness = dir.path().join("witness");
         std::fs::hard_link(&path, &witness).unwrap();
-        registry.record(2);
-        assert_eq!(PidRegistry::new(&witness).previous(), vec![1]);
+        registry.record(2, None);
+        assert_eq!(PidRegistry::new(&witness).previous(), vec![(1, None)]);
     }
 
     #[test]
-    fn ignores_garbage_in_the_file() {
+    fn reads_older_files_and_ignores_garbage() {
         let (dir, registry) = registry();
         let path = dir.path().join("TunnelBar").join("ssh.pids");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
-        std::fs::write(&path, "12\nnot a pid\n\n34\n").unwrap();
-        assert_eq!(registry.previous(), vec![12, 34]);
+        std::fs::write(&path, format!("12\nnot a pid\n\n34\t{STARTED}\n")).unwrap();
+        assert_eq!(
+            registry.previous(),
+            vec![(12, None), (34, started(STARTED))]
+        );
     }
 
     #[derive(Default)]
     struct FakeInspector {
-        processes: HashMap<u32, (u32, String)>,
+        processes: HashMap<u32, ProcessInfo>,
         terminated: RefCell<Vec<u32>>,
     }
 
+    impl FakeInspector {
+        fn add(&mut self, pid: u32, ppid: u32, started: &str, command: &str) {
+            let info = ProcessInfo {
+                ppid,
+                started: started.into(),
+                command: command.into(),
+            };
+            self.processes.insert(pid, info);
+        }
+    }
+
     impl ProcessInspector for FakeInspector {
-        fn describe(&self, pid: u32) -> Option<(u32, String)> {
+        fn describe(&self, pid: u32) -> Option<ProcessInfo> {
             self.processes.get(&pid).cloned()
         }
 
@@ -183,24 +245,29 @@ mod tests {
     }
 
     #[test]
-    fn kills_only_orphaned_tunnel_processes() {
+    fn kills_only_orphaned_tunnel_processes_started_at_the_recorded_time() {
         let (dir, registry) = registry();
-        for pid in [10, 20, 30, 40] {
-            registry.record(pid);
+        for pid in [10, 20, 30, 40, 50, 60] {
+            registry.record(pid, started(STARTED));
         }
+        registry.record(70, None);
         let ssh = format!("{SSH_SIGNATURE} -o ServerAliveInterval=15 -- host");
         let mut inspector = FakeInspector::default();
-        inspector.processes.insert(10, (1, ssh.clone())); // orphan tunnel
-        inspector.processes.insert(20, (555, ssh)); // still has a parent
-        inspector
-            .processes
-            .insert(30, (1, "/usr/bin/vim notes".into())); // recycled PID
-        // 40 is gone.
+        inspector.add(10, 1, STARTED, &ssh); // orphan tunnel
+        inspector.add(20, 555, STARTED, &ssh); // still has a parent
+        inspector.add(30, 1, STARTED, "/usr/bin/vim notes"); // another program
+        inspector.add(40, 1, "Tue Nov  3 09:00:00 2026", &ssh); // recycled PID
+        // 50 is gone.
+        inspector.add(60, 1, STARTED, &ssh); // orphan tunnel
+        inspector.add(70, 1, STARTED, &ssh); // recorded by an older version, no start time
 
         let fresh = PidRegistry::new(dir.path().join("TunnelBar").join("ssh.pids"));
-        assert_eq!(clean_orphans(&fresh, &inspector, SSH_SIGNATURE), vec![10]);
-        assert_eq!(*inspector.terminated.borrow(), vec![10]);
-        assert_eq!(fresh.previous(), Vec::<u32>::new());
+        assert_eq!(
+            clean_orphans(&fresh, &inspector, SSH_SIGNATURE),
+            vec![10, 60, 70]
+        );
+        assert_eq!(*inspector.terminated.borrow(), vec![10, 60, 70]);
+        assert_eq!(fresh.previous(), vec![]);
     }
 
     #[test]
@@ -214,8 +281,14 @@ mod tests {
             .trim()
             .parse()
             .unwrap();
-        let (ppid, command) = SystemInspector.describe(pid).expect("sleep runs");
-        assert_eq!((ppid, command.as_str()), (1, "sleep 3600"));
+        let info = SystemInspector.describe(pid).expect("sleep runs");
+        assert_eq!((info.ppid, info.command.as_str()), (1, "sleep 3600"));
+        assert_eq!(info.started.len(), STARTED.len(), "{:?}", info.started);
+        assert_eq!(
+            SystemInspector.describe(pid),
+            Some(info),
+            "stable start time"
+        );
 
         SystemInspector.terminate(pid);
         for _ in 0..50 {
@@ -225,5 +298,11 @@ mod tests {
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
         panic!("process {pid} still alive");
+    }
+
+    #[test]
+    fn terminating_a_missing_process_is_harmless() {
+        SystemInspector.terminate(u32::MAX);
+        SystemInspector.terminate(0);
     }
 }

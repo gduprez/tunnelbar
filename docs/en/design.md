@@ -165,11 +165,11 @@ Stopped ──start──► Connecting ──port open──► Up
 - Menu bar only: no Dock icon, not in Cmd+Tab.
 - "Launch at login" setting (off by default), via `SMAppService`.
 - Per-tunnel `autostart` (off by default).
-- Quitting stops every `ssh` process. The PIDs of running `ssh` processes
-  are recorded in `ssh.pids` next to the configuration; at startup, a recorded
+- Quitting stops every `ssh` process. The PIDs and start times of running
+  `ssh` processes are recorded in `ssh.pids` next to the configuration; at startup, a recorded
   process is killed only if it was orphaned (parent is launchd) and its command
-  line starts with TunnelBar's exact `ssh` options, so a recycled PID never
-  hits an unrelated process.
+  line starts with TunnelBar's exact `ssh` options and it started at the
+  recorded time, so a recycled PID never hits an unrelated process.
 - Launch at login uses `SMAppService` (`src-tauri/src/login_item.rs`, the
   only module allowed to use `unsafe`, for the Objective-C calls).
 

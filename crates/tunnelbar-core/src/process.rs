@@ -14,7 +14,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::task::JoinHandle;
 
 use crate::command::SshCommand;
-use crate::orphans::PidRegistry;
+use crate::orphans::{PidRegistry, ProcessInspector, SystemInspector};
 
 pub trait ProcessSpawner: Send + Sync + 'static {
     type Process: TunnelProcess;
@@ -93,7 +93,9 @@ impl ProcessSpawner for SystemSpawner {
         });
         let pid = child.id();
         if let (Some(registry), Some(pid)) = (&self.registry, pid) {
-            registry.record(pid);
+            // The start time lets a later run tell this process from a recycled PID.
+            let started = SystemInspector.describe(pid).map(|info| info.started);
+            registry.record(pid, started);
         }
         Ok(SystemProcess {
             child,
