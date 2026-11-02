@@ -1,0 +1,33 @@
+name: Rapport de bug (français)
+description: Quelque chose ne fonctionne pas comme prévu.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Que s'est-il passé ?
+      description: Ce que vous avez fait, ce que vous attendiez, ce qui s'est passé à la place.
+    validations:
+      required: true
+  - type: textarea
+    id: tunnel
+    attributes:
+      label: Définition du tunnel
+      description: Le tunnel tiré de tunnels.toml, avec noms d'hôte et utilisateurs anonymisés si besoin.
+      render: toml
+  - type: textarea
+    id: logs
+    attributes:
+      label: Sortie de ssh et journaux
+      description: >-
+        La « Sortie de ssh » du détail du tunnel, et les lignes utiles de
+        ~/Library/Logs/io.github.gduprez.tunnelbar/tunnelbar.log.
+      render: text
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Version de TunnelBar, version de macOS, Apple Silicon ou Intel.
+      placeholder: TunnelBar 0.1.0, macOS 14.8, Apple Silicon
+    validations:
+      required: true

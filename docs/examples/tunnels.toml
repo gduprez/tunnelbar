@@ -1,0 +1,56 @@
+# TunnelBar configuration example.
+# Location: ~/Library/Application Support/TunnelBar/tunnels.toml
+# Reference: docs/en/configuration.md (English), docs/fr/configuration.md (français)
+
+version = 1
+
+# Equivalent of: ssh -N -L 54321:127.0.0.1:5432 203.0.113.10
+[[tunnel]]
+id = "prod-db"
+name = "Prod PostgreSQL"
+host = "203.0.113.10"
+
+[[tunnel.forward]]
+type = "local"
+local_port = 54321
+remote_host = "127.0.0.1"
+remote_port = 5432
+
+# One connection, several forwards, using an alias from ~/.ssh/config.
+[[tunnel]]
+id = "staging"
+name = "Staging (DB + Redis + SOCKS)"
+host = "staging-bastion"
+user = "deploy"
+port = 2222
+autostart = true
+
+[[tunnel.forward]]
+type = "local"
+local_port = 54322
+remote_host = "db.internal"
+remote_port = 5432
+
+[[tunnel.forward]]
+type = "local"
+local_port = 63790
+remote_host = "127.0.0.1"
+remote_port = 6379
+
+[[tunnel.forward]]
+type = "dynamic"
+local_port = 1080
+
+# Expose a local dev server on the remote machine (port 8080 there -> 3000 here).
+[[tunnel]]
+id = "demo"
+name = "Demo webhook"
+host = "demo.example.com"
+auto_reconnect = false
+accept_new_host_key = true
+
+[[tunnel.forward]]
+type = "remote"
+remote_port = 8080
+local_host = "127.0.0.1"
+local_port = 3000

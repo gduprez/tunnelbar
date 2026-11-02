@@ -1,0 +1,15 @@
+name: Demande d'évolution (français)
+description: Proposer une amélioration.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: De quoi avez-vous besoin ?
+      description: Le problème à résoudre, avant toute solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Solution envisagée

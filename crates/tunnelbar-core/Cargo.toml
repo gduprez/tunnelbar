@@ -1,0 +1,28 @@
+[package]
+name = "tunnelbar-core"
+description = "Domain logic of TunnelBar: tunnel model, configuration, ssh supervision"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[features]
+# Scriptable fakes of ssh and the network, for the tests of crates using the core.
+testing = []
+
+[lints]
+workspace = true
+
+[dependencies]
+log = "0.4.35"
+serde = { version = "1.0.229", features = ["derive"] }
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["rt", "sync", "time", "process", "io-util", "net", "macros"] }
+toml = "1.1.8"
+
+[dev-dependencies]
+serde_json = "1.0.154"
+tempfile = "3.27.0"
+tokio = { version = "1.54.1", features = ["rt", "macros", "test-util", "rt-multi-thread"] }

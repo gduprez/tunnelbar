@@ -1,0 +1,8 @@
+/target/
+/src-tauri/target/
+/src-tauri/gen/schemas/
+/dist/
+/node_modules/
+/coverage/
+lcov.info
+.DS_Store
