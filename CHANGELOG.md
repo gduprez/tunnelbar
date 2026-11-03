@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.2.1](https://github.com/gduprez/tunnelbar/compare/v0.2.0...v0.2.1) (2026-11-03)
+
+
+### Bug Fixes
+
+* **deps:** replace yanked async-executor 1.14.0 with 1.14.1 ([e976106](https://github.com/gduprez/tunnelbar/commit/e9761063c2a1a9eac5ae69fe48c6a17a8b1209d1))
+* launch at login can be turned on before the app ever registered ([6347269](https://github.com/gduprez/tunnelbar/commit/6347269bc9a6ff7a58873875446f2b6fab4675f4))
+* **ui:** key action menu items by position, not by their translated label ([8543d0b](https://github.com/gduprez/tunnelbar/commit/8543d0b67d5cd71c223bbf10bd60711d8d521611))
+
 ## [0.2.0](https://github.com/gduprez/tunnelbar/compare/v0.1.1...v0.2.0) (2026-11-02)
 
 
