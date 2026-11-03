@@ -89,6 +89,29 @@ automatiquement, et la langue apparaît dans les réglages sous son propre nom.
 
 Signalez les vulnérabilités en privé : voir [SECURITY.md](SECURITY.md).
 
+Garder TunnelBar exempt de vulnérabilités connues fait partie de chaque
+changement :
+
+- **À chaque push et pull request**, la CI échoue sur un avis RustSec ou une
+  crate retirée (`cargo deny`), et sur un avis de gravité haute dans les
+  dépendances npm livrées dans l'app (`npm audit --omit=dev`).
+- **Chaque lundi**, la CI tourne à nouveau sur `main`, pour qu'une
+  vulnérabilité publiée dans une dépendance soit détectée même sans commit.
+- **Dependabot** propose chaque semaine les mises à jour des actions GitHub et
+  des dépendances Cargo et npm.
+- **Avant de fusionner une pull request de version**
+  (`chore(main): release x.y.z`), un audit de sécurité des changements depuis
+  la version précédente est obligatoire : lancez le skill Claude Code
+  `/security-audit` sur `git diff <tag précédent>..main` (ou relisez à la
+  main). Les points critiques, hauts et moyens sont corrigés avant la
+  publication ; les points bas sont corrigés ou suivis dans une issue.
+- Règles que tout changement respecte : `ssh` n'est jamais lancé via un shell
+  et chaque valeur saisie est validée par le core ; pas de `{@html}`,
+  d'`innerHTML` ni de ressource distante dans l'interface ; la CSP et les
+  permissions Tauri ne font que se durcir ; toute valeur venant de la webview
+  est vérifiée côté Rust ; `unsafe` reste confiné à
+  `src-tauri/src/login_item.rs`.
+
 ## Licence
 
 En contribuant, vous acceptez que vos contributions soient distribuées sous

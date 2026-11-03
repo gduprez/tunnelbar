@@ -86,6 +86,26 @@ language appears in the settings under its own name.
 
 Please report vulnerabilities privately: see [SECURITY.md](SECURITY.md).
 
+Keeping TunnelBar free of known vulnerabilities is part of every change:
+
+- **On every push and pull request**, the CI fails on a RustSec advisory or a
+  yanked crate (`cargo deny`) and on a high-severity advisory in the npm
+  dependencies shipped in the app (`npm audit --omit=dev`).
+- **Every Monday**, the CI runs again on `main`, so that a vulnerability
+  published in a dependency is caught even without commits.
+- **Dependabot** proposes updates of the GitHub actions, Cargo and npm
+  dependencies every week.
+- **Before merging a release pull request** (`chore(main): release x.y.z`), a
+  security audit of the changes since the previous release is required: run
+  the `/security-audit` Claude Code skill on `git diff <previous tag>..main`
+  (or review it by hand). Critical, high and medium findings are fixed before
+  the release; low ones are fixed or tracked in an issue.
+- Rules that every change keeps: `ssh` is never run through a shell and every
+  user value is validated by the core; no `{@html}`, `innerHTML` or remote
+  resource in the UI; the CSP and the Tauri capabilities only get stricter;
+  any value coming from the webview is checked on the Rust side; `unsafe`
+  stays confined to `src-tauri/src/login_item.rs`.
+
 ## License
 
 By contributing, you agree that your contributions are licensed under

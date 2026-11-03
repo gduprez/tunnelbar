@@ -4,6 +4,10 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Weekly, so that a vulnerability published in a dependency is caught even without commits.
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
 
 # Pull requests from forks get a read-only token anyway; make it explicit for every run.
 permissions:
@@ -28,6 +32,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      # Dependencies shipped in the app; dev tools are checked by Dependabot.
+      - name: Audit runtime npm dependencies
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run format:check
       - run: npm run lint
       - run: npm run check
