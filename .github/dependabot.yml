@@ -30,6 +30,9 @@ updates:
       # svelte-check do not support it yet: try again once they do.
       - dependency-name: typescript
         versions: ['>=7']
+      # Types follow the Node.js major of .nvmrc.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
     groups:
       npm-minor-and-patch:
         update-types: [minor, patch]
