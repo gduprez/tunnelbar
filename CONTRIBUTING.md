@@ -53,7 +53,9 @@ The core keeps at least **85 %** line coverage (CI-enforced).
 
 ## Checks
 
-The CI runs all of these; run them before pushing:
+`scripts/check.sh` runs locally every check of the CI (`--build` also builds
+the app), so you know in a minute whether a change will pass. The CI runs all
+of these:
 
 ```sh
 cargo fmt --all --check

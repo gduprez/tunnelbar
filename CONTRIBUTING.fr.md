@@ -56,7 +56,9 @@ Le core garde au moins **85 %** de couverture des lignes (vérifié par la CI).
 
 ## Contrôles
 
-La CI les exécute tous ; lancez-les avant de pousser :
+`scripts/check.sh` lance en local tous les contrôles de la CI (`--build`
+construit aussi l'app) : vous savez en une minute si un changement passera.
+La CI exécute tous ceux-ci :
 
 ```sh
 cargo fmt --all --check
