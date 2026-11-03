@@ -74,7 +74,7 @@
   </button>
   {#if open}
     <div bind:this={menu} class="menu" role="menu" aria-label={label} tabindex="-1" {onkeydown}>
-      {#each items as item (item.label)}
+      {#each items as item, index (index)}
         {#if item.separatorBefore}
           <div class="separator" role="separator"></div>
         {/if}
