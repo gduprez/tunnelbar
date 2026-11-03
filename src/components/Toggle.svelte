@@ -6,6 +6,7 @@
     label,
     labelledby,
     tone = 'pending',
+    disabled = false,
     onchange,
   }: {
     checked: boolean;
@@ -13,6 +14,7 @@
     label?: string;
     labelledby?: string;
     tone?: Tone;
+    disabled?: boolean;
     onchange: () => void;
   } = $props();
 </script>
@@ -26,6 +28,7 @@
   aria-label={label}
   aria-labelledby={labelledby}
   title={label}
+  {disabled}
   onclick={(event) => {
     event.stopPropagation();
     onchange();

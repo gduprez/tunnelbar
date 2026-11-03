@@ -38,13 +38,12 @@
   <div class="group">
     <div class="group-row">
       <span id="setting-login" class="label">{t('settings.login')}</span>
-      {#if loginItem !== null && loginItem !== 'unavailable'}
-        <Toggle
-          checked={loginEnabled}
-          labelledby="setting-login"
-          onchange={() => onloginitem(!loginEnabled)}
-        />
-      {/if}
+      <Toggle
+        checked={loginEnabled}
+        labelledby="setting-login"
+        disabled={loginItem === null || loginItem === 'unavailable'}
+        onchange={() => onloginitem(!loginEnabled)}
+      />
     </div>
     <div class="group-row">
       <label for="setting-language" class="label">{t('settings.language')}</label>

@@ -281,4 +281,13 @@ describe('App', () => {
     ).toBeInTheDocument();
     expect(screen.getByLabelText('Port on this Mac')).toHaveAttribute('aria-invalid', 'true');
   });
+
+  it('keeps the launch at login switch visible but disabled when unavailable', async () => {
+    vi.mocked(api.loginItem).mockResolvedValueOnce('unavailable');
+    render(App, { locale: 'en' });
+    await fireEvent.click(await screen.findByRole('button', { name: 'Settings' }));
+    const toggle = await screen.findByRole('switch', { name: 'Open TunnelBar at login' });
+    expect(toggle).toBeDisabled();
+    expect(screen.getByText('Only available for the installed app.')).toBeInTheDocument();
+  });
 });
