@@ -1,6 +1,6 @@
 //! User preferences of the app itself, next to the tunnels file.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
@@ -19,11 +19,6 @@ impl Default for Settings {
             language: AUTO.into(),
         }
     }
-}
-
-/// `settings.toml`, in the directory of the tunnels file.
-pub fn settings_path(config_path: &Path) -> PathBuf {
-    config_path.with_file_name("settings.toml")
 }
 
 /// Missing or unreadable settings are the defaults: they are never worth blocking the app.
@@ -52,14 +47,6 @@ pub fn resolve_locale(settings: &Settings, system: &str, available: &[&str]) -> 
 mod tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
-
-    #[test]
-    fn lives_next_to_the_tunnels_file() {
-        assert_eq!(
-            settings_path(Path::new("/a/TunnelBar/tunnels.toml")),
-            PathBuf::from("/a/TunnelBar/settings.toml")
-        );
-    }
 
     #[test]
     fn missing_or_broken_files_give_defaults() {

@@ -49,8 +49,8 @@ l'intégration au bureau et sur la distribution.
 | PID des `ssh` | `…/TunnelBar/ssh.pids` | `$XDG_STATE_HOME/tunnelbar/ssh.pids` (défaut `~/.local/state/tunnelbar/`) |
 | Journaux | `~/Library/Logs/io.github.gduprez.tunnelbar/` | `$XDG_STATE_HOME/tunnelbar/logs/` (via le plugin de logs de Tauri) |
 
-`default_config_path(home)` devient une fonction par système, testée sur les
-deux. Mêmes règles de sécurité : dossiers en `0700`, fichiers en `0600`,
+Fait (L1) : `tunnelbar_core::paths::AppPaths` donne ces chemins par système,
+testé sur les deux ; sous macOS ils sont identiques aux précédents. Mêmes règles de sécurité : dossiers en `0700`, fichiers en `0600`,
 écriture atomique.
 
 ### 3.2 Lancement à l'ouverture de session (faible)

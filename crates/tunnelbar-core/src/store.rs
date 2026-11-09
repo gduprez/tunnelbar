@@ -30,11 +30,6 @@ pub trait ConfigStore {
     fn save(&self, config: &Config) -> Result<(), ConfigError>;
 }
 
-/// `~/Library/Application Support/TunnelBar/tunnels.toml`
-pub fn default_config_path(home: &Path) -> PathBuf {
-    home.join("Library/Application Support/TunnelBar/tunnels.toml")
-}
-
 #[derive(Debug, Clone)]
 pub struct FileConfigStore {
     path: PathBuf,
@@ -143,14 +138,6 @@ mod tests {
                 }],
             }],
         }
-    }
-
-    #[test]
-    fn default_path_is_in_application_support() {
-        assert_eq!(
-            default_config_path(Path::new("/Users/alice")),
-            PathBuf::from("/Users/alice/Library/Application Support/TunnelBar/tunnels.toml")
-        );
     }
 
     #[test]

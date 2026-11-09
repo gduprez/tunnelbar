@@ -20,14 +20,15 @@ use tauri_plugin_notification::NotificationExt;
 use tunnelbar_core::error::TunnelError;
 use tunnelbar_core::manager::TunnelManager;
 use tunnelbar_core::orphans::{PidRegistry, SSH_SIGNATURE, SystemInspector, clean_orphans};
+use tunnelbar_core::paths::AppPaths;
 use tunnelbar_core::process::{SystemSpawner, TcpPortProber};
 use tunnelbar_core::state::TunnelState;
-use tunnelbar_core::store::{ConfigError, ConfigStore, FileConfigStore, default_config_path};
+use tunnelbar_core::store::{ConfigError, ConfigStore, FileConfigStore};
 use tunnelbar_core::supervisor::TunnelStatus;
 use tunnelbar_core::system_events::{NetworkWatcher, WakeDetector};
 
 use i18n::{Translator, available_locales, detect_locale};
-use settings::{Settings, settings_path};
+use settings::Settings;
 use tray::{MenuAction, PanelAction, PanelToggle, Rect, TrayLook};
 
 pub(crate) const PANEL: &str = "panel";
@@ -123,15 +124,16 @@ pub fn run() {
 }
 
 fn load_state(app: &AppHandle) -> tauri::Result<AppState> {
-    let store = FileConfigStore::new(default_config_path(&app.path().home_dir()?));
+    let paths = AppPaths::current(&app.path().home_dir()?);
+    let store = FileConfigStore::new(paths.tunnels.clone());
     let locales = sys_locale::get_locales().collect::<Vec<_>>();
     let system_locale = detect_locale(locales.iter().map(String::as_str), &available_locales());
-    let settings_path = settings_path(store.path());
+    let settings_path = paths.settings.clone();
     let settings = settings::load(&settings_path);
     let locale = settings::resolve_locale(&settings, &system_locale, &available_locales());
 
     // ssh processes of a TunnelBar that crashed would otherwise hold their ports forever.
-    let registry = PidRegistry::new(store.path().with_file_name("ssh.pids"));
+    let registry = PidRegistry::new(paths.pids.clone());
     let killed = clean_orphans(&registry, &SystemInspector, SSH_SIGNATURE);
     if !killed.is_empty() {
         log::warn!("stopped orphaned ssh processes: {killed:?}");
