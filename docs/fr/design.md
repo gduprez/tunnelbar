@@ -159,6 +159,14 @@ Arrêté ──start──► Connexion ──port ouvert──► Actif
   quand son processus a vécu 5 s.
 - Une connexion dont les ports sont toujours fermés au bout de 30 s est tuée
   puis relancée (`ConnectionTimedOut`).
+- **Port local déjà pris** : avant chaque démarrage, chaque port local est
+  testé ; s'il accepte déjà des connexions, il appartient à un autre programme
+  et le tunnel échoue (`PortInUse`) sans lancer `ssh`. Sinon, le test de port
+  répondrait pour ce programme et afficherait le tunnel actif. De même, une
+  ligne `bind …: Address already in use` arrête `ssh` et fait échouer le
+  tunnel : `ssh` continue de tourner s'il écoute sur `[::1]` mais pas sur
+  `127.0.0.1` (ou l'inverse), car `ExitOnForwardFailure` ne joue que si aucune
+  adresse n'a pu être ouverte.
 - **Reconnexion** (`auto_reconnect = true` par défaut) : délai exponentiel
   1 s, 2 s, 4 s… plafonné à 60 s. Les erreurs fatales (`AuthFailed`,
   `PortInUse`, `HostKeyMismatch`, `HostKeyUnknown`) arrêtent les tentatives.

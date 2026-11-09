@@ -32,6 +32,9 @@ pub enum Behavior {
         up_for: Duration,
         stderr: Vec<String>,
     },
+    /// Prints `stderr` at once, then serves like [`Behavior::serve`]: `ssh` keeps running when
+    /// some, but not all, addresses of a forward cannot be bound.
+    WarnThenServe { stderr: Vec<String> },
     /// Runs until killed without ever opening its ports.
     Hang,
     /// Cannot be started at all.
@@ -58,6 +61,12 @@ impl Behavior {
     pub fn serve_then_exit(up_for: Duration, stderr: &str) -> Self {
         Behavior::ServeThenExit {
             up_for,
+            stderr: stderr.lines().map(str::to_owned).collect(),
+        }
+    }
+
+    pub fn warn_then_serve(stderr: &str) -> Self {
+        Behavior::WarnThenServe {
             stderr: stderr.lines().map(str::to_owned).collect(),
         }
     }
@@ -169,6 +178,15 @@ impl ProcessSpawner for FakeSpawner {
             inner.running += 1;
             behavior
         };
+        let behavior = match behavior {
+            Behavior::WarnThenServe { stderr } => {
+                for line in stderr {
+                    let _ = output.send(line);
+                }
+                Behavior::serve()
+            }
+            other => other,
+        };
         Ok(FakeProcess {
             network: self.network.clone(),
             ports: listened_ports(command),
@@ -247,6 +265,7 @@ impl TunnelProcess for FakeProcess {
                 Some(255)
             }
             Behavior::Hang | Behavior::SpawnError => pending().await,
+            Behavior::WarnThenServe { .. } => unreachable!("replaced by Serve at spawn"),
         }
     }
 

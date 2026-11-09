@@ -54,6 +54,19 @@ pub fn diagnose(stderr: &str, exit_code: Option<i32>) -> TunnelError {
     }
 }
 
+/// A local forward that could not listen on one of its addresses, from one line of stderr.
+///
+/// `ssh` reports it but keeps running when another address of the same forward was bound
+/// (`ExitOnForwardFailure` only applies when none was): the forward is then shared with
+/// another program, so the tunnel must not be considered up.
+pub fn local_bind_failure(line: &str) -> Option<TunnelError> {
+    (line.starts_with("bind ") && line.contains("Address already in use")).then(|| {
+        TunnelError::PortInUse {
+            port: port_in_bind_line(line),
+        }
+    })
+}
+
 /// `bind [127.0.0.1]:54321: …` or `bind 127.0.0.1 port 54321: …`
 fn port_in_bind_line(line: &str) -> Option<u16> {
     number_after(line, "]:").or_else(|| number_after(line, " port "))
@@ -131,6 +144,29 @@ mod tests {
         check(
             "Could not request local forwarding.",
             PortInUse { port: None },
+        );
+    }
+
+    #[test]
+    fn a_failed_local_bind_is_spotted_line_by_line() {
+        assert_eq!(
+            local_bind_failure("bind [127.0.0.1]:15022: Address already in use"),
+            Some(PortInUse { port: Some(15022) })
+        );
+        assert_eq!(
+            local_bind_failure("bind [::1]:1080: Address already in use"),
+            Some(PortInUse { port: Some(1080) })
+        );
+        assert_eq!(
+            local_bind_failure("bind [127.0.0.1]:80: Permission denied"),
+            None,
+            "privileged ports are rejected by validation"
+        );
+        assert_eq!(
+            local_bind_failure(
+                "Warning: Permanently added 'h' (ED25519) to the list of known hosts."
+            ),
+            None
         );
     }
 

@@ -10,7 +10,7 @@ use tokio::task::JoinHandle;
 use tokio::time::{Instant, sleep_until};
 
 use crate::command::SshCommand;
-use crate::diagnosis::diagnose;
+use crate::diagnosis::{diagnose, local_bind_failure};
 use crate::error::TunnelError;
 use crate::model::{Forward, Tunnel};
 use crate::process::{PortProber, ProcessSpawner, TunnelProcess};
@@ -210,8 +210,13 @@ impl<S: ProcessSpawner, P: PortProber> Supervisor<S, P> {
                     self.apply(Event::Exited { error }).await;
                 }
                 Wake::Line(line) => {
+                    let failure = local_bind_failure(&line);
                     self.record(line);
                     self.publish();
+                    if let Some(error) = failure {
+                        self.kill().await;
+                        self.apply(Event::Exited { error }).await;
+                    }
                 }
                 Wake::RetryDue => {
                     self.retry_at = None;
@@ -229,7 +234,15 @@ impl<S: ProcessSpawner, P: PortProber> Supervisor<S, P> {
             for action in actions {
                 match action {
                     Action::Spawn => {
-                        if !self.spawn() {
+                        let taken = first_open(self.prober.clone(), self.local_ports.clone());
+                        if let Some(port) = taken.await {
+                            self.record(format!(
+                                "local port {port} is already used by another program"
+                            ));
+                            next_event = Some(Event::Exited {
+                                error: TunnelError::PortInUse { port: Some(port) },
+                            });
+                        } else if !self.spawn() {
                             next_event = Some(Event::Exited {
                                 error: TunnelError::SpawnFailed,
                             });
@@ -367,6 +380,18 @@ async fn all_open<P: PortProber>(prober: Arc<P>, ports: Vec<u16>) -> bool {
         }
     }
     true
+}
+
+/// The first port that already accepts connections. Checked before `ssh` runs: `ssh` might
+/// still start, on the other loopback address, and the tunnel would look up while its port
+/// leads to another program.
+async fn first_open<P: PortProber>(prober: Arc<P>, ports: Vec<u16>) -> Option<u16> {
+    for port in ports {
+        if prober.is_open(port).await {
+            return Some(port);
+        }
+    }
+    None
 }
 
 async fn wait<T: TunnelProcess>(process: &mut Option<T>) -> Option<i32> {
@@ -554,6 +579,59 @@ mod tests {
         .await;
         sleep(Duration::from_secs(600)).await;
         assert_eq!(network.spawn_count(), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_local_port_taken_by_another_program_fails_without_running_ssh() {
+        let network = FakeNetwork::new();
+        network.occupy(54321);
+        let handle = supervise(&network, tunnel());
+        handle.send(Command::Start);
+
+        let status = until(
+            &handle,
+            is(TunnelState::Failed {
+                error: TunnelError::PortInUse { port: Some(54321) },
+            }),
+        )
+        .await;
+        assert_eq!(network.spawn_count(), 0);
+        assert!(status.logs.iter().any(|line| line.contains("54321")));
+    }
+
+    /// `ssh` keeps running when it binds `[::1]` but not `127.0.0.1` (or the reverse): the
+    /// forward would then reach another program, so the tunnel must fail, not come up.
+    #[tokio::test(start_paused = true)]
+    async fn a_forward_bound_on_some_addresses_only_fails() {
+        let network = FakeNetwork::new();
+        network.script(Behavior::warn_then_serve(
+            "bind [127.0.0.1]:54321: Address already in use",
+        ));
+        let handle = supervise(&network, tunnel());
+        handle.send(Command::Start);
+
+        until(
+            &handle,
+            is(TunnelState::Failed {
+                error: TunnelError::PortInUse { port: Some(54321) },
+            }),
+        )
+        .await;
+        assert_eq!((network.spawn_count(), network.running()), (1, 0));
+        sleep(Duration::from_secs(600)).await;
+        assert_eq!(network.spawn_count(), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_harmless_warning_does_not_fail_the_tunnel() {
+        let network = FakeNetwork::new();
+        network.script(Behavior::warn_then_serve(
+            "Warning: Permanently added 'localhost' (ED25519) to the list of known hosts.",
+        ));
+        let handle = supervise(&network, tunnel());
+        handle.send(Command::Start);
+        let status = until(&handle, is(TunnelState::Up)).await;
+        assert_eq!(status.logs.len(), 1);
     }
 
     #[tokio::test(start_paused = true)]

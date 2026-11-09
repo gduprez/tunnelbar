@@ -150,6 +150,14 @@ Stopped ──start──► Connecting ──port open──► Up
   process has lived 5 s.
 - A connection whose ports are still closed after 30 s is killed and retried
   (`ConnectionTimedOut`).
+- **Local port already taken**: before each start, every local port is probed;
+  one that already accepts connections belongs to another program, and the
+  tunnel fails (`PortInUse`) without running `ssh`. Otherwise the probe would
+  answer for that program and show the tunnel up. Likewise, a
+  `bind …: Address already in use` line kills `ssh` and fails the tunnel:
+  `ssh` keeps running when it binds `[::1]` but not `127.0.0.1` (or the
+  reverse), since `ExitOnForwardFailure` applies only when no address could be
+  bound.
 - **Reconnection** (`auto_reconnect = true` by default): exponential backoff
   1 s, 2 s, 4 s… capped at 60 s. Fatal errors (`AuthFailed`, `PortInUse`,
   `HostKeyMismatch`, `HostKeyUnknown`) stop retrying.
