@@ -46,6 +46,9 @@ pub trait PortProber: Send + Sync + 'static {
 pub struct SystemSpawner {
     program: Option<PathBuf>,
     registry: Option<Arc<PidRegistry>>,
+    /// Linux: children are spawned from this thread, so that they end with TunnelBar.
+    #[cfg(target_os = "linux")]
+    spawn_thread: Arc<crate::linux::SpawnThread>,
 }
 
 impl SystemSpawner {
@@ -57,7 +60,7 @@ impl SystemSpawner {
     pub fn with_program(program: impl Into<PathBuf>) -> Self {
         SystemSpawner {
             program: Some(program.into()),
-            registry: None,
+            ..Self::default()
         }
     }
 
@@ -77,13 +80,14 @@ impl ProcessSpawner for SystemSpawner {
         output: UnboundedSender<String>,
     ) -> io::Result<SystemProcess> {
         let program = self.program.as_ref().unwrap_or(&command.program);
-        let mut child = Command::new(program)
+        let mut process = Command::new(program);
+        process
             .args(&command.args)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::piped())
-            .kill_on_drop(true)
-            .spawn()?;
+            .kill_on_drop(true);
+        let mut child = self.start(process)?;
         let stderr = child.stderr.take().expect("stderr is piped");
         let reader = tokio::spawn(async move {
             let mut lines = BufReader::new(stderr).lines();
@@ -102,6 +106,24 @@ impl ProcessSpawner for SystemSpawner {
             reader: Some(reader),
             registration: pid.zip(self.registry.clone()),
         })
+    }
+}
+
+impl SystemSpawner {
+    #[cfg(target_os = "linux")]
+    fn start(&self, mut process: Command) -> io::Result<Child> {
+        crate::linux::end_with_spawning_thread(process.as_std_mut());
+        // The child must be registered with this runtime to be awaited.
+        let runtime = tokio::runtime::Handle::current();
+        self.spawn_thread.run(move || {
+            let _runtime = runtime.enter();
+            process.spawn()
+        })
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    fn start(&self, mut process: Command) -> io::Result<Child> {
+        process.spawn()
     }
 }
 

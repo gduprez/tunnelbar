@@ -5,6 +5,8 @@ pub mod diagnosis;
 pub mod error;
 #[cfg(any(test, feature = "testing"))]
 pub mod fake;
+#[cfg(target_os = "linux")]
+pub mod linux;
 pub mod manager;
 pub mod model;
 pub mod orphans;

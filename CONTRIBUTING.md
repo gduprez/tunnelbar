@@ -106,7 +106,8 @@ Keeping TunnelBar free of known vulnerabilities is part of every change:
   user value is validated by the core; no `{@html}`, `innerHTML` or remote
   resource in the UI; the CSP and the Tauri capabilities only get stricter;
   any value coming from the webview is checked on the Rust side; `unsafe`
-  stays confined to `src-tauri/src/login_item.rs`.
+  stays confined to `src-tauri/src/login_item.rs` (macOS) and
+  `crates/tunnelbar-core/src/linux.rs` (Linux).
 
 ## License
 

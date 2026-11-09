@@ -17,7 +17,7 @@ workspace = true
 
 [dependencies]
 log = "0.4.35"
-nix = { version = "0.31.3", default-features = false, features = ["signal"] }
+nix = { version = "0.31.3", default-features = false, features = ["signal", "process"] }
 serde = { version = "1.0.229", features = ["derive"] }
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["rt", "sync", "time", "process", "io-util", "net", "macros"] }

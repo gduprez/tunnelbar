@@ -11,7 +11,8 @@ repository = "https://github.com/gduprez/tunnelbar"
 authors = ["Guillaume Duprez <5592436+gduprez@users.noreply.github.com>"]
 
 [workspace.lints.rust]
-# Denied everywhere; only src-tauri/src/login_item.rs (Objective-C bindings) allows it.
+# Denied everywhere; only src-tauri/src/login_item.rs (Objective-C bindings, macOS) and
+# crates/tunnelbar-core/src/linux.rs (pre_exec, Linux) allow it.
 unsafe_code = "deny"
 
 [workspace.lints.clippy]

@@ -112,7 +112,8 @@ changement :
   d'`innerHTML` ni de ressource distante dans l'interface ; la CSP et les
   permissions Tauri ne font que se durcir ; toute valeur venant de la webview
   est vérifiée côté Rust ; `unsafe` reste confiné à
-  `src-tauri/src/login_item.rs`.
+  `src-tauri/src/login_item.rs` (macOS) et `crates/tunnelbar-core/src/linux.rs`
+  (Linux).
 
 ## Licence
 
