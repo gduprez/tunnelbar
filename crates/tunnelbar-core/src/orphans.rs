@@ -1,9 +1,10 @@
 //! Cleans up `ssh` processes left behind by a TunnelBar that crashed or was killed.
 //!
 //! The PIDs of running tunnels are recorded in a file with the start time of each process.
-//! At the next start, a recorded process is killed only if it was orphaned (its parent is now
-//! launchd), still looks like a TunnelBar `ssh`, and started at the recorded time: a PID that
-//! macOS recycled for another process is never hit.
+//! At the next start, a recorded process is killed only if it was orphaned (its parent is no
+//! longer a TunnelBar: launchd on macOS, PID 1 or `systemd --user` on Linux), still looks like
+//! a TunnelBar `ssh`, and started at the recorded time: a recycled PID is never hit, nor the
+//! tunnels of a TunnelBar still running.
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -91,6 +92,8 @@ impl PidRegistry {
 pub trait ProcessInspector {
     /// What is known of a running process, if it exists.
     fn describe(&self, pid: u32) -> Option<ProcessInfo>;
+    /// Path or name of a running process's executable (`ps -o comm=`), if it exists.
+    fn executable(&self, pid: u32) -> Option<String>;
     fn terminate(&self, pid: u32);
 }
 
@@ -117,6 +120,16 @@ impl ProcessInspector for SystemInspector {
         })
     }
 
+    fn executable(&self, pid: u32) -> Option<String> {
+        let output = std::process::Command::new("/bin/ps")
+            .args(["-o", "comm=", "-p", &pid.to_string()])
+            .env("LC_ALL", "C")
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&output.stdout).trim().to_owned();
+        (!text.is_empty()).then_some(text)
+    }
+
     fn terminate(&self, pid: u32) {
         use nix::sys::signal::{Signal, kill};
         use nix::unistd::Pid;
@@ -131,6 +144,14 @@ impl ProcessInspector for SystemInspector {
     }
 }
 
+/// Whether an executable is TunnelBar's, from `ps -o comm=`: a full path on macOS
+/// (spaces included), a short name on Linux.
+fn is_tunnelbar(executable: Option<&str>) -> bool {
+    executable
+        .and_then(|path| path.rsplit('/').next())
+        .is_some_and(|name| name == "tunnelbar")
+}
+
 /// Kills the orphans an earlier run left, then empties the registry file. Returns their PIDs.
 pub fn clean_orphans(
     registry: &PidRegistry,
@@ -142,7 +163,7 @@ pub fn clean_orphans(
         .into_iter()
         .filter(|(pid, recorded)| {
             inspector.describe(*pid).is_some_and(|info| {
-                info.ppid == 1
+                !is_tunnelbar(inspector.executable(info.ppid).as_deref())
                     && info.command.starts_with(signature)
                     && recorded
                         .as_ref()
@@ -220,6 +241,7 @@ mod tests {
     #[derive(Default)]
     struct FakeInspector {
         processes: HashMap<u32, ProcessInfo>,
+        executables: HashMap<u32, String>,
         terminated: RefCell<Vec<u32>>,
     }
 
@@ -232,11 +254,19 @@ mod tests {
             };
             self.processes.insert(pid, info);
         }
+
+        fn parent(&mut self, pid: u32, executable: &str) {
+            self.executables.insert(pid, executable.into());
+        }
     }
 
     impl ProcessInspector for FakeInspector {
         fn describe(&self, pid: u32) -> Option<ProcessInfo> {
             self.processes.get(&pid).cloned()
+        }
+
+        fn executable(&self, pid: u32) -> Option<String> {
+            self.executables.get(&pid).cloned()
         }
 
         fn terminate(&self, pid: u32) {
@@ -253,8 +283,10 @@ mod tests {
         registry.record(70, None);
         let ssh = format!("{SSH_SIGNATURE} -o ServerAliveInterval=15 -- host");
         let mut inspector = FakeInspector::default();
+        inspector.parent(1, "/sbin/launchd");
+        inspector.parent(555, "/Applications/TunnelBar.app/Contents/MacOS/tunnelbar");
         inspector.add(10, 1, STARTED, &ssh); // orphan tunnel
-        inspector.add(20, 555, STARTED, &ssh); // still has a parent
+        inspector.add(20, 555, STARTED, &ssh); // a running TunnelBar's tunnel
         inspector.add(30, 1, STARTED, "/usr/bin/vim notes"); // another program
         inspector.add(40, 1, "Tue Nov  3 09:00:00 2026", &ssh); // recycled PID
         // 50 is gone.
@@ -271,6 +303,52 @@ mod tests {
     }
 
     #[test]
+    fn on_linux_an_orphan_adopted_by_systemd_is_cleaned_up() {
+        // systemd --user adopts orphans of the session: their parent is not PID 1.
+        let (dir, registry) = registry();
+        for pid in [10, 20, 30] {
+            registry.record(pid, started(STARTED));
+        }
+        let ssh = format!("{SSH_SIGNATURE} -- host");
+        let mut inspector = FakeInspector::default();
+        inspector.parent(1500, "systemd");
+        inspector.parent(2600, "tunnelbar");
+        inspector.add(10, 1500, STARTED, &ssh); // adopted by systemd: orphan
+        inspector.add(20, 2600, STARTED, &ssh); // a running TunnelBar's tunnel
+        inspector.add(30, 4242, STARTED, &ssh); // parent vanished meanwhile: orphan
+
+        let fresh = PidRegistry::new(dir.path().join("TunnelBar").join("ssh.pids"));
+        assert_eq!(
+            clean_orphans(&fresh, &inspector, SSH_SIGNATURE),
+            vec![10, 30]
+        );
+    }
+
+    #[test]
+    fn a_running_tunnelbar_is_recognised_whatever_its_folder() {
+        let (dir, registry) = registry();
+        registry.record(10, started(STARTED));
+        let mut inspector = FakeInspector::default();
+        inspector.parent(
+            700,
+            "/Applications/My Tools/TunnelBar.app/Contents/MacOS/tunnelbar",
+        );
+        inspector.add(10, 700, STARTED, &format!("{SSH_SIGNATURE} -- host"));
+
+        let fresh = PidRegistry::new(dir.path().join("TunnelBar").join("ssh.pids"));
+        assert_eq!(clean_orphans(&fresh, &inspector, SSH_SIGNATURE), vec![]);
+    }
+
+    #[test]
+    fn real_inspector_names_executables() {
+        assert_eq!(SystemInspector.executable(u32::MAX), None);
+        let own = SystemInspector
+            .executable(std::process::id())
+            .expect("the test runs");
+        assert!(!own.is_empty());
+    }
+
+    #[test]
     fn real_inspector_describes_and_terminates_processes() {
         // `sh` exits at once, leaving `sleep` orphaned.
         let output = std::process::Command::new("/bin/sh")
@@ -282,6 +360,11 @@ mod tests {
             .parse()
             .unwrap();
         let info = SystemInspector.describe(pid).expect("sleep runs");
+        let executable = SystemInspector.executable(pid).expect("sleep runs");
+        assert!(
+            executable == "sleep" || executable.ends_with("/sleep"),
+            "{executable}"
+        );
         assert_eq!((info.ppid, info.command.as_str()), (1, "sleep 3600"));
         assert_eq!(info.started.len(), STARTED.len(), "{:?}", info.started);
         assert_eq!(
