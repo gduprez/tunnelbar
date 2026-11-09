@@ -5,6 +5,7 @@
   import Settings from './components/Settings.svelte';
   import TunnelDetail from './components/TunnelDetail.svelte';
   import TunnelEditor from './components/TunnelEditor.svelte';
+  import TrayMissing from './components/TrayMissing.svelte';
   import TunnelList from './components/TunnelList.svelte';
   import { api } from './lib/api';
   import { emptyForm, fromTunnel, type TunnelForm } from './lib/form';
@@ -15,6 +16,7 @@
     ConfigInfo,
     ConfigProblem,
     LoginItem,
+    PlatformView,
     SettingsView,
     Tunnel,
     TunnelView,
@@ -34,6 +36,7 @@
   let config = $state<ConfigInfo | null>(null);
   let settings = $state<SettingsView | null>(null);
   let loginItem = $state<LoginItem | null>(null);
+  let platform = $state<PlatformView | null>(null);
   let now = $state(Date.now());
   let notice = $state<string | null>(null);
   let confirmingDelete = $state(false);
@@ -70,6 +73,7 @@
     refresh();
     api.settings().then((loaded) => (settings = loaded));
     api.loginItem().then((loaded) => (loginItem = loaded));
+    api.platform().then((loaded) => (platform = loaded));
     const unlisteners = [
       api.onStatus((status) => (tunnels = applyStatus(tunnels, status))),
       api.onTunnelsChanged(refresh),
@@ -223,6 +227,9 @@
 
   <div class="body" bind:this={body}>
     <div>
+      {#if platform?.os === 'linux' && platform.tray_available !== true && view.name === 'list'}
+        <TrayMissing {t} />
+      {/if}
       {#if config?.problem && view.name !== 'edit'}
         <ConfigBanner problem={config.problem} {t} onopen={() => api.openConfig()} />
       {/if}

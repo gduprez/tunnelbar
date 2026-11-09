@@ -170,6 +170,24 @@ pub fn fit_panel(window: tauri::WebviewWindow, height: f64) -> Result<(), String
         .map_err(|error| error.to_string())
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct PlatformView {
+    pub os: &'static str,
+    /// Whether the desktop shows tray icons; None when unknown.
+    pub tray_available: Option<bool>,
+}
+
+#[tauri::command]
+pub fn get_platform(state: State<'_, AppState>) -> PlatformView {
+    PlatformView {
+        os: match Os::current() {
+            Os::MacOs => "macos",
+            Os::Linux => "linux",
+        },
+        tray_available: state.tray_available,
+    }
+}
+
 #[tauri::command]
 pub fn get_login_item() -> LoginItem {
     login_item::status()

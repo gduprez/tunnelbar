@@ -134,5 +134,8 @@
   "form.section_behaviour": "Behaviour",
   "form.try_port": "Try {port}.",
   "validation.local_port_conflict_named": "Port {port} is already used by “{name}”.",
-  "settings.general": "General"
+  "settings.general": "General",
+  "tray_missing.title": "The TunnelBar icon cannot appear in the top bar.",
+  "tray_missing.body": "Turn on the “Ubuntu AppIndicators” extension in the Extensions app, or install it:",
+  "tray_missing.then": "Then log out and back in. Meanwhile, closing this window quits TunnelBar and stops its tunnels."
 }

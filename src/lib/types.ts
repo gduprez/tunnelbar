@@ -75,3 +75,9 @@ export interface SettingsView {
 
 /** Launch at login, as reported by SMAppService. */
 export type LoginItem = 'enabled' | 'disabled' | 'requires_approval' | 'unavailable';
+
+export interface PlatformView {
+  os: 'macos' | 'linux';
+  /** Whether the desktop shows tray icons; null when unknown. */
+  tray_available: boolean | null;
+}

@@ -4,6 +4,7 @@ import type {
   ConfigInfo,
   ConfigProblem,
   LoginItem,
+  PlatformView,
   SettingsView,
   Tunnel,
   TunnelStatus,
@@ -36,6 +37,7 @@ export const api = {
   copy: (text: string) => navigator.clipboard.writeText(text),
   /** Resizes the panel to its content; the Rust side bounds the height. */
   fitPanel: (height: number) => invoke<void>('fit_panel', { height }),
+  platform: () => invoke<PlatformView>('get_platform'),
   loginItem: () => invoke<LoginItem>('get_login_item'),
   setLoginItem: (enabled: boolean) => invoke<LoginItem>('set_login_item', { enabled }),
 };

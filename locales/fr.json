@@ -134,5 +134,8 @@
   "form.section_behaviour": "Comportement",
   "form.try_port": "Essayez {port}.",
   "validation.local_port_conflict_named": "Le port {port} est déjà utilisé par « {name} ».",
-  "settings.general": "Général"
+  "settings.general": "Général",
+  "tray_missing.title": "L'icône de TunnelBar ne peut pas apparaître dans la barre du haut.",
+  "tray_missing.body": "Activez l'extension « Ubuntu AppIndicators » dans l'application Extensions, ou installez-la :",
+  "tray_missing.then": "Puis fermez et rouvrez votre session. En attendant, fermer cette fenêtre quitte TunnelBar et arrête ses tunnels."
 }

@@ -31,6 +31,7 @@ vi.mock('./lib/api', () => ({
     }),
     copy: vi.fn(async () => {}),
     fitPanel: vi.fn(async () => {}),
+    platform: vi.fn(async () => ({ os: 'macos', tray_available: true })),
     loginItem: vi.fn(async () => 'disabled'),
     setLoginItem: vi.fn(async (enabled: boolean) => (enabled ? 'enabled' : 'disabled')),
   },
@@ -289,5 +290,20 @@ describe('App', () => {
     const toggle = await screen.findByRole('switch', { name: 'Open TunnelBar at login' });
     expect(toggle).toBeDisabled();
     expect(screen.getByText('Only available for the installed app.')).toBeInTheDocument();
+  });
+
+  it('explains how to show the tray icon on Linux when it is missing', async () => {
+    vi.mocked(api.platform).mockResolvedValueOnce({ os: 'linux', tray_available: false });
+    render(App, { locale: 'en' });
+    const banner = await screen.findByRole('note');
+    expect(banner).toHaveTextContent('The TunnelBar icon cannot appear in the top bar');
+    expect(banner).toHaveTextContent('sudo apt install gnome-shell-extension-appindicator');
+  });
+
+  it('shows no tray banner when the icon is visible', async () => {
+    vi.mocked(api.platform).mockResolvedValueOnce({ os: 'linux', tray_available: true });
+    render(App, { locale: 'en' });
+    await screen.findByText('PostgreSQL prod');
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 });

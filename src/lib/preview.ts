@@ -96,6 +96,8 @@ export function installPreview() {
       case 'set_language':
         if (command === 'set_language') language = params.language as string;
         return { language, locale: language === 'auto' ? 'en' : language, available: ['en', 'fr'] };
+      case 'get_platform':
+        return { os: 'macos', tray_available: true };
       case 'fit_panel':
         return null;
       case 'get_login_item':

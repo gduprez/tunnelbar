@@ -6,6 +6,7 @@ mod desktop_entry;
 mod i18n;
 mod login_item;
 mod notify;
+mod platform;
 mod settings;
 mod tray;
 
@@ -23,7 +24,7 @@ use tauri_plugin_notification::NotificationExt;
 use tunnelbar_core::error::TunnelError;
 use tunnelbar_core::manager::TunnelManager;
 use tunnelbar_core::orphans::{PidRegistry, SSH_SIGNATURE, SystemInspector, clean_orphans};
-use tunnelbar_core::paths::AppPaths;
+use tunnelbar_core::paths::{AppPaths, Os};
 use tunnelbar_core::process::{SystemSpawner, TcpPortProber};
 use tunnelbar_core::state::TunnelState;
 use tunnelbar_core::store::{ConfigError, ConfigStore, FileConfigStore};
@@ -53,6 +54,8 @@ pub struct AppState {
     /// Modification time of the tunnels file when TunnelBar last read or wrote it.
     pub config_seen: Mutex<Option<SystemTime>>,
     panel_toggle: Mutex<PanelToggle>,
+    /// Whether the desktop shows tray icons (None: unknown).
+    pub tray_available: Option<bool>,
     /// Tunnel names and states the tray menu was last built from.
     menu_shown: Mutex<Option<Vec<(String, TunnelState)>>>,
 }
@@ -89,6 +92,7 @@ pub fn run() {
             commands::get_login_item,
             commands::set_login_item,
             commands::fit_panel,
+            commands::get_platform,
         ])
         .setup(|app| {
             // Menu bar only: no Dock icon, not listed in Cmd+Tab.
@@ -97,21 +101,40 @@ pub fn run() {
             let state = load_state(app.handle())?;
             app.manage(state);
             build_tray(app.handle())?;
+            setup_panel(app.handle());
             forward_statuses(app.handle().clone());
             watch_config_file(app.handle().clone());
             watch_system_events(app.handle().clone());
             Ok(())
         })
         .on_window_event(|window, event| {
-            // The panel behaves like a popover: it closes when it loses focus.
-            if window.label() == PANEL && matches!(event, tauri::WindowEvent::Focused(false)) {
-                let _ = window.hide();
-                window
-                    .state::<AppState>()
-                    .panel_toggle
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .hidden_on_blur(Instant::now());
+            if window.label() != PANEL {
+                return;
+            }
+            match event {
+                // Closing the panel hides it while TunnelBar stays in the tray; without a
+                // visible tray icon, closing quits (and stops the tunnels).
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    let tray_available = window.state::<AppState>().tray_available;
+                    if platform::close_hides_panel(Os::current(), tray_available) {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    } else {
+                        window.app_handle().exit(0);
+                    }
+                }
+                // macOS: the panel behaves like a popover, it closes when it loses focus. On
+                // Linux it is a normal window, which stays open.
+                tauri::WindowEvent::Focused(false) if cfg!(target_os = "macos") => {
+                    let _ = window.hide();
+                    window
+                        .state::<AppState>()
+                        .panel_toggle
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .hidden_on_blur(Instant::now());
+                }
+                _ => {}
             }
         })
         .build(tauri::generate_context!())
@@ -164,6 +187,7 @@ fn load_state(app: &AppHandle) -> tauri::Result<AppState> {
         system_locale,
         config_seen: Mutex::new(None),
         panel_toggle: Mutex::new(PanelToggle::default()),
+        tray_available: platform::tray_available(),
         menu_shown: Mutex::new(None),
     };
     state.remember_config_file();
@@ -254,7 +278,8 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .icon(look_icon(TrayLook::Idle)?)
         .icon_as_template(true)
         .tooltip(format!("TunnelBar {}", tunnelbar_core::version()))
-        .show_menu_on_left_click(false)
+        // Linux: tray clicks are not reported, a click opens the menu (and its "Open panel…").
+        .show_menu_on_left_click(cfg!(target_os = "linux"))
         .on_menu_event(|app, event| {
             if let Some(action) = MenuAction::from_id(event.id().as_ref()) {
                 on_menu_action(app, action);
@@ -439,6 +464,24 @@ fn toggle_panel(app: &AppHandle, icon: Rect) {
 }
 
 /// Shows the panel, right below the tray icon when its position is known.
+/// macOS: a borderless popover under the icon. Linux: a normal window (Wayland lets no app
+/// place its windows), shown at start when no tray icon can be seen.
+fn setup_panel(app: &AppHandle) {
+    let Some(panel) = app.get_webview_window(PANEL) else {
+        return;
+    };
+    if cfg!(target_os = "linux") {
+        let _ = panel.set_decorations(true);
+        let _ = panel.set_always_on_top(false);
+        let _ = panel.set_skip_taskbar(false);
+    }
+    let tray_available = app.state::<AppState>().tray_available;
+    if platform::show_window_at_start(Os::current(), tray_available) {
+        log::warn!("no tray icon host found: showing the window");
+        show_panel(app, None);
+    }
+}
+
 fn show_panel(app: &AppHandle, icon: Option<Rect>) {
     let Some(panel) = app.get_webview_window(PANEL) else {
         return;
