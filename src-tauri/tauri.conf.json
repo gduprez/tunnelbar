@@ -46,7 +46,7 @@
     "shortDescription": "Start, stop and monitor SSH tunnels from the menu bar",
     "linux": {
       "deb": {
-        "depends": ["openssh-client"],
+        "depends": ["openssh-client", "libglib2.0-bin", "xdg-utils"],
         "section": "net"
       },
       "appimage": {

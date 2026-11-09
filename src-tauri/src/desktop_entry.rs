@@ -18,6 +18,23 @@ pub fn autostart_path(home: &Path, config_home: Option<&str>) -> PathBuf {
         .join(FILE_NAME)
 }
 
+/// The program the autostart entry must launch: the AppImage file when TunnelBar runs from
+/// one (`APPIMAGE`, accepted only if it names an existing file by an absolute path), else the
+/// running executable, refused once deleted (replaced by an upgrade).
+pub fn autostart_executable(
+    appimage: Option<&Path>,
+    current: std::io::Result<PathBuf>,
+) -> Result<PathBuf, String> {
+    if let Some(appimage) = appimage.filter(|path| path.is_absolute() && path.is_file()) {
+        return Ok(appimage.to_path_buf());
+    }
+    let current = current.map_err(|error| error.to_string())?;
+    if current.to_string_lossy().ends_with(" (deleted)") {
+        return Err("TunnelBar was upgraded: restart it first".into());
+    }
+    Ok(current)
+}
+
 /// Content of the autostart entry launching `executable`, or None if its path cannot be
 /// written safely (control characters).
 pub fn autostart_entry(executable: &Path) -> Option<String> {
@@ -76,6 +93,39 @@ mod tests {
             autostart_path(home, Some("relative")),
             PathBuf::from("/home/alice/.config/autostart/tunnelbar.desktop")
         );
+    }
+
+    #[test]
+    fn prefers_an_existing_appimage() {
+        let dir = tempfile::tempdir().unwrap();
+        let appimage = dir.path().join("TunnelBar.AppImage");
+        std::fs::write(&appimage, "").unwrap();
+        let current = Ok(PathBuf::from("/tmp/.mount_x/usr/bin/tunnelbar"));
+        assert_eq!(autostart_executable(Some(&appimage), current), Ok(appimage));
+    }
+
+    #[test]
+    fn ignores_an_appimage_variable_that_names_no_file() {
+        let current = || Ok(PathBuf::from("/usr/bin/tunnelbar"));
+        for bogus in [
+            "/nowhere/TunnelBar.AppImage",
+            "relative/TunnelBar.AppImage",
+            "",
+        ] {
+            assert_eq!(
+                autostart_executable(Some(Path::new(bogus)), current()),
+                Ok(PathBuf::from("/usr/bin/tunnelbar")),
+                "{bogus}"
+            );
+        }
+    }
+
+    #[test]
+    fn refuses_a_deleted_or_unknown_executable() {
+        let deleted = Ok(PathBuf::from("/usr/bin/tunnelbar (deleted)"));
+        assert!(autostart_executable(None, deleted).is_err());
+        let unknown = Err(std::io::Error::other("no /proc"));
+        assert!(autostart_executable(None, unknown).is_err());
     }
 
     #[test]

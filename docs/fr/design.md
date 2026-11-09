@@ -175,14 +175,20 @@ Arrêté ──start──► Connexion ──port ouvert──► Actif
 - Réglage « Lancer au démarrage » (désactivé par défaut), via `SMAppService`.
 - `autostart` par tunnel (désactivé par défaut).
 - Quitter l'app arrête tous les processus `ssh`. Les PID et heures de
-  démarrage des processus `ssh` en cours sont enregistrés dans `ssh.pids`, à côté de la configuration ; au
-  lancement, un processus enregistré n'est tué que s'il est orphelin (parent =
-  launchd) et que sa ligne de commande commence par les options `ssh` exactes
-  de TunnelBar et qu'il a démarré à l'heure enregistrée : un PID recyclé ne
-  touche jamais un processus sans rapport.
-- Le lancement à l'ouverture de session utilise `SMAppService`
-  (`src-tauri/src/login_item.rs`, seul module autorisé à utiliser `unsafe`,
-  pour les appels Objective-C).
+  démarrage des processus `ssh` en cours sont enregistrés dans `ssh.pids` ; au
+  lancement, un processus enregistré n'est tué que s'il est orphelin (son
+  parent n'est plus un exécutable `tunnelbar` : launchd sur macOS, PID 1 ou
+  `systemd --user` sous Linux), que sa ligne de commande commence par les
+  options `ssh` exactes de TunnelBar et qu'il a démarré à l'heure enregistrée.
+  Un PID recyclé ne touche jamais un processus sans rapport, ni les tunnels d'un
+  TunnelBar encore en cours.
+- Sous Linux, chaque `ssh` reçoit aussi un signal de mort du parent
+  (`PR_SET_PDEATHSIG`), depuis un thread de lancement dédié : il s'arrête avec
+  TunnelBar, même en cas de plantage.
+- Le lancement à l'ouverture de session utilise `SMAppService` sur macOS et une
+  entrée d'autostart XDG sous Linux. `unsafe` n'est autorisé que dans deux
+  modules : `src-tauri/src/login_item/macos.rs` (appels Objective-C) et
+  `crates/tunnelbar-core/src/linux.rs` (`pre_exec`).
 
 ## 7. Interface
 

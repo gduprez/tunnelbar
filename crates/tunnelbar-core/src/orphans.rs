@@ -10,6 +10,11 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
+/// Name of TunnelBar's executable, which tells a running TunnelBar from an adoptive parent.
+/// The app checks it matches its own binary: renaming it would make every start kill the
+/// tunnels of a TunnelBar already running.
+pub const EXECUTABLE_NAME: &str = "tunnelbar";
+
 /// Start of the command line of every `ssh` run by TunnelBar.
 pub const SSH_SIGNATURE: &str = "/usr/bin/ssh -N -o ExitOnForwardFailure=yes";
 
@@ -149,7 +154,7 @@ impl ProcessInspector for SystemInspector {
 fn is_tunnelbar(executable: Option<&str>) -> bool {
     executable
         .and_then(|path| path.rsplit('/').next())
-        .is_some_and(|name| name == "tunnelbar")
+        .is_some_and(|name| name == EXECUTABLE_NAME)
 }
 
 /// Kills the orphans an earlier run left, then empties the registry file. Returns their PIDs.

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use super::LoginItem;
-use crate::desktop_entry::{autostart_entry, autostart_path};
+use crate::desktop_entry::{autostart_entry, autostart_executable, autostart_path};
 
 fn entry_path() -> Option<PathBuf> {
     let home = PathBuf::from(std::env::var_os("HOME")?);
@@ -23,10 +23,8 @@ pub fn set(enabled: bool) -> Result<LoginItem, String> {
     let path = entry_path().ok_or("no home directory")?;
     if enabled {
         // An AppImage runs from a temporary mount: start the AppImage file itself.
-        let executable = match std::env::var_os("APPIMAGE") {
-            Some(appimage) => PathBuf::from(appimage),
-            None => std::env::current_exe().map_err(|error| error.to_string())?,
-        };
+        let appimage = std::env::var_os("APPIMAGE").map(PathBuf::from);
+        let executable = autostart_executable(appimage.as_deref(), std::env::current_exe())?;
         let entry = autostart_entry(&executable).ok_or("unsupported executable path")?;
         tunnelbar_core::store::write_private(&path, &entry).map_err(|error| error.to_string())?;
     } else {

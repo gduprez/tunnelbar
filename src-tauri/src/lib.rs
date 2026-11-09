@@ -519,3 +519,15 @@ fn place_below(panel: &WebviewWindow, icon: Rect) -> tauri::Result<()> {
     let (x, y) = tray::panel_origin(icon, panel_width, screen);
     panel.set_position(PhysicalPosition::new(x, y))
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_binary_is_named_as_the_orphan_cleanup_expects() {
+        // The binary takes the package name; orphan cleanup recognises TunnelBar by it.
+        assert_eq!(
+            env!("CARGO_PKG_NAME"),
+            tunnelbar_core::orphans::EXECUTABLE_NAME
+        );
+    }
+}

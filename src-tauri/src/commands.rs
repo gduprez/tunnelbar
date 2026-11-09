@@ -348,7 +348,6 @@ pub fn toggle_tunnel<S: ProcessSpawner, P: PortProber>(
     }
 }
 
-/// Opens the configuration file in TextEdit, creating an empty one first if needed.
 /// The program and arguments opening `path` in a text editor; never through a shell.
 pub fn editor_command(os: Os, path: &Path) -> (&'static str, Vec<OsString>) {
     match os {
@@ -357,6 +356,7 @@ pub fn editor_command(os: Os, path: &Path) -> (&'static str, Vec<OsString>) {
     }
 }
 
+/// Opens the configuration file in the system text editor, creating an empty one first if needed.
 pub fn open_config_file(state: &AppState) {
     let path = state.store.path();
     if !path.exists()
