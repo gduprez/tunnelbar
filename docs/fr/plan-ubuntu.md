@@ -169,7 +169,8 @@ SHA-256.
   clippy, tests Rust du core et de l'app, couverture du core, build des paquets.
   Les minutes Linux coûtent 10 fois moins que les minutes macOS.
 - `scripts/check.sh` fonctionne aussi sous Linux.
-- **Test manuel avant chaque version Linux**, sur machines virtuelles et sur un
+- **Test manuel avant chaque version Linux** ([checklist](recette-ubuntu.md)),
+  sur machines virtuelles et sur un
   poste réel (Ubuntu 24.04.5, GNOME 46, X11, amd64, noyau 7.0) :
 
 | Ubuntu | Session | Vérifications |
