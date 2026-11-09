@@ -5,6 +5,8 @@
 TunnelBar vit dans la barre de menus, à côté de l'heure. Il démarre, arrête et
 surveille vos tunnels SSH, et les reconnecte tout seul.
 
+> Sous Ubuntu, voir [TunnelBar sous Ubuntu](linux.md).
+
 ## Installation
 
 ### Avec Homebrew

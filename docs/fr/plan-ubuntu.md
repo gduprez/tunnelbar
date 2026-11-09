@@ -195,6 +195,10 @@ Les règles de `CONTRIBUTING` s'appliquent sans exception. Points spécifiques :
 
 ## 8. Jalons (en TDD, chacun livrable)
 
+Avancement au 9 novembre 2026 : L0 à L5 et L7 faits sur `feat/linux` ; restent
+L6 (recette sur de vrais bureaux, dont le poste Ubuntu 24.04.5 / X11) et L8
+(audit de sécurité, première version Linux).
+
 | # | Jalon | Contenu | Estimation |
 |---|---|---|---|
 | L0 | CI Linux | Job Ubuntu : le core compile et ses tests passent ; l'app compile avec bouchons | 0,5 j |

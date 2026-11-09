@@ -78,6 +78,7 @@ npm run format:check && npm run lint && npm run check && npm test
 ## Documentation
 
 - [Guide d'utilisation](docs/fr/user-guide.md)
+- [TunnelBar sous Ubuntu](docs/fr/linux.md) (en cours sur la branche `feat/linux`)
 - [Référence de la configuration](docs/fr/configuration.md)
 - [Contribuer](CONTRIBUTING.fr.md)
 - [Document de conception](docs/fr/design.md)
