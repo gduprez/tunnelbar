@@ -1,5 +1,8 @@
 mod commands;
 mod config_view;
+// Used by the Linux launch at login; compiled and tested on every system.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+mod desktop_entry;
 mod i18n;
 mod login_item;
 mod notify;

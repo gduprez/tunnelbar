@@ -1,21 +1,11 @@
-//! Launch at login, through SMAppService (macOS 13+).
+//! macOS launch at login, through SMAppService (macOS 13+).
 
 // The only unsafe code of TunnelBar: Objective-C calls of the ServiceManagement framework.
 #![allow(unsafe_code)]
 
 use objc2_service_management::{SMAppService, SMAppServiceStatus};
-use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum LoginItem {
-    Enabled,
-    Disabled,
-    /// Registered, but the user must allow it in System Settings › General › Login Items.
-    RequiresApproval,
-    /// Not available, e.g. when running outside an application bundle.
-    Unavailable,
-}
+use super::LoginItem;
 
 pub fn status() -> LoginItem {
     // SAFETY: `mainAppService` and `status` take no arguments and have no preconditions;
