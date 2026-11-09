@@ -1,10 +1,14 @@
 //! Tauri commands called by the panel, and the actions they share with the tray menu.
 
+use std::ffi::OsString;
+use std::path::Path;
+
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tunnelbar_core::command::SshCommand;
 use tunnelbar_core::manager::{ManagerError, TunnelManager};
 use tunnelbar_core::model::{CONFIG_VERSION, Config, Tunnel};
+use tunnelbar_core::paths::Os;
 use tunnelbar_core::process::{PortProber, ProcessSpawner};
 use tunnelbar_core::store::{ConfigError, ConfigStore};
 use tunnelbar_core::supervisor::TunnelStatus;
@@ -327,6 +331,14 @@ pub fn toggle_tunnel<S: ProcessSpawner, P: PortProber>(
 }
 
 /// Opens the configuration file in TextEdit, creating an empty one first if needed.
+/// The program and arguments opening `path` in a text editor; never through a shell.
+pub fn editor_command(os: Os, path: &Path) -> (&'static str, Vec<OsString>) {
+    match os {
+        Os::MacOs => ("/usr/bin/open", vec!["-t".into(), path.into()]),
+        Os::Linux => ("/usr/bin/xdg-open", vec![path.into()]),
+    }
+}
+
 pub fn open_config_file(state: &AppState) {
     let path = state.store.path();
     if !path.exists()
@@ -335,11 +347,8 @@ pub fn open_config_file(state: &AppState) {
         log::error!("cannot create {}: {error}", path.display());
         return;
     }
-    if let Err(error) = std::process::Command::new("/usr/bin/open")
-        .arg("-t")
-        .arg(path)
-        .spawn()
-    {
+    let (program, args) = editor_command(Os::current(), path);
+    if let Err(error) = std::process::Command::new(program).args(args).spawn() {
         log::error!("cannot open {}: {error}", path.display());
     }
 }
@@ -422,6 +431,19 @@ mod tests {
             version: CONFIG_VERSION,
             tunnels,
         }
+    }
+
+    #[test]
+    fn opens_the_configuration_with_the_system_editor() {
+        let path = Path::new("/home/alice/.config/tunnelbar/tunnels.toml");
+        assert_eq!(
+            editor_command(Os::MacOs, path),
+            ("/usr/bin/open", vec!["-t".into(), path.into()])
+        );
+        assert_eq!(
+            editor_command(Os::Linux, path),
+            ("/usr/bin/xdg-open", vec![path.into()])
+        );
     }
 
     #[test]

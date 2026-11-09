@@ -291,12 +291,21 @@ fn on_menu_action(app: &AppHandle, action: MenuAction) {
     }
 }
 
+/// macOS: black template images, tinted by the system. Linux: white, for Ubuntu's dark top bar.
 fn look_icon(look: TrayLook) -> tauri::Result<Image<'static>> {
-    Image::from_bytes(match look {
+    #[cfg(not(target_os = "linux"))]
+    let bytes: &[u8] = match look {
         TrayLook::Idle => include_bytes!("../icons/tray/idle.png"),
         TrayLook::Active => include_bytes!("../icons/tray/active.png"),
         TrayLook::Problem => include_bytes!("../icons/tray/problem.png"),
-    })
+    };
+    #[cfg(target_os = "linux")]
+    let bytes: &[u8] = match look {
+        TrayLook::Idle => include_bytes!("../icons/tray/linux/idle.png"),
+        TrayLook::Active => include_bytes!("../icons/tray/linux/active.png"),
+        TrayLook::Problem => include_bytes!("../icons/tray/linux/problem.png"),
+    };
+    Image::from_bytes(bytes)
 }
 
 /// Rebuilds the tray menu and icon when a tunnel's state (not just its logs) changed.
