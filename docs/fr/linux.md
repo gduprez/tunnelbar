@@ -80,7 +80,7 @@ TunnelBar s'arrête, même brutalement : aucun tunnel ne reste ouvert à votre i
 ## Désinstallation
 
 ```sh
-sudo apt remove tunnelbar
+sudo apt remove tunnel-bar
 rm -f ~/.config/autostart/tunnelbar.desktop
 ```
 

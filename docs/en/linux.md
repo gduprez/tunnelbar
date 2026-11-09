@@ -79,7 +79,7 @@ stops, even abruptly: no tunnel stays open behind your back.
 ## Uninstall
 
 ```sh
-sudo apt remove tunnelbar
+sudo apt remove tunnel-bar
 rm -f ~/.config/autostart/tunnelbar.desktop
 ```
 
