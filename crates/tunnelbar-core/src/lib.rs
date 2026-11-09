@@ -8,6 +8,7 @@ pub mod fake;
 pub mod manager;
 pub mod model;
 pub mod orphans;
+pub mod paths;
 pub mod process;
 pub mod state;
 pub mod store;
