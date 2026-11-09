@@ -104,3 +104,40 @@ jobs:
           git add Casks/tunnelbar.rb
           git commit -m "tunnelbar ${VERSION}"
           git -c http.https://github.com/.extraheader="$auth" push
+
+  linux:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.release-please.outputs.version }}
+      TAG: ${{ needs.release-please.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install the system libraries of Tauri
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - run: npm ci
+      - name: Build the .deb and the AppImage
+        run: npx tauri build --bundles deb,appimage
+      - name: Attach the packages to the release
+        run: |
+          deb="TunnelBar_${VERSION}_amd64.deb"
+          appimage="TunnelBar_${VERSION}_amd64.AppImage"
+          cp target/release/bundle/deb/*.deb "$deb"
+          cp target/release/bundle/appimage/*.AppImage "$appimage"
+          for file in "$deb" "$appimage"; do shasum -a 256 "$file" | tee "$file.sha256"; done
+          gh release upload "$TAG" "$deb" "$deb.sha256" "$appimage" "$appimage.sha256" --clobber
