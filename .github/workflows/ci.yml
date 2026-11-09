@@ -52,6 +52,23 @@ jobs:
       - run: cargo fmt --all --check
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
 
+  # Ubuntu port (docs/fr/plan-ubuntu.md): the reference architecture is amd64.
+  ubuntu:
+    name: Ubuntu 24.04 (core tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+          components: clippy
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+      - uses: taiki-e/install-action@1919c4a95903d2c33e4a221102edca87309fc14b # v2
+        with:
+          tool: cargo-nextest
+      - run: cargo clippy -p tunnelbar-core --all-targets -- -D warnings
+      - run: cargo nextest run -p tunnelbar-core
+
   macos:
     name: macOS (clippy, tests, coverage, app build)
     runs-on: macos-latest
