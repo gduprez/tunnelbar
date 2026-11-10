@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/gduprez/tunnelbar/compare/v0.2.1...v0.3.0) (2026-11-10)
+
+
+### Features
+
+* **app:** Linux launch at login through an XDG autostart entry; the app builds on Linux (L3) ([8b4e5d0](https://github.com/gduprez/tunnelbar/commit/8b4e5d0de1e61ba2382bd4d5d1d56f60cb602d00))
+* **app:** Linux panel as a normal window, tray detection over D-Bus, explanation when no icon can be shown (L4) ([23aad73](https://github.com/gduprez/tunnelbar/commit/23aad731615e936b860c7085168177b60e30e6e0))
+* **app:** xdg-open for the configuration file and white tray icons on Linux (L3) ([4288a9c](https://github.com/gduprez/tunnelbar/commit/4288a9cc0ba5c7ee65b0f86b67fbad057b9f5e01))
+* **core:** on Linux, ssh processes end with TunnelBar even if it crashes (PR_SET_PDEATHSIG from a dedicated spawn thread) (L2) ([5933e17](https://github.com/gduprez/tunnelbar/commit/5933e1783f31b5ff40a64806fd23f8c9dbf805af))
+* **core:** per-OS application paths, XDG on Linux (L1) ([7955e59](https://github.com/gduprez/tunnelbar/commit/7955e5928b269d2cd4c3678e6c7d671c92adbd2d))
+
+
+### Bug Fixes
+
+* audit hardening of the Linux port — .deb runtime deps, validated autostart executable, shared executable name, docs ([c6eaed4](https://github.com/gduprez/tunnelbar/commit/c6eaed4e8db200be0b312824dc7d2f9040915d3d))
+* **core:** an orphan is an ssh whose parent is no longer TunnelBar, which covers systemd --user (L2) ([1893dc5](https://github.com/gduprez/tunnelbar/commit/1893dc506137490d4349f6d8bd1466553465fd45))
+* **core:** fail a tunnel whose local port is taken by another program ([f488174](https://github.com/gduprez/tunnelbar/commit/f488174e22ddf93d7a87973870d0dcb808a38502))
+* **security:** harden release, CI and bind detection before going public ([1415384](https://github.com/gduprez/tunnelbar/commit/14153840070fab745c46f6b22531bbdb50f3f61b))
+
 ## [0.2.1](https://github.com/gduprez/tunnelbar/compare/v0.2.0...v0.2.1) (2026-11-03)
 
 
