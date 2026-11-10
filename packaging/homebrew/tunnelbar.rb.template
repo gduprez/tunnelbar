@@ -8,15 +8,19 @@ cask "tunnelbar" do
   desc "Menu bar app to start, stop and monitor SSH tunnels"
   homepage "https://github.com/gduprez/tunnelbar"
 
-  depends_on macos: ">= :ventura"
+  livecheck do
+    url :url
+    strategy :github_latest
+  end
+
+  depends_on macos: :ventura
 
   app "TunnelBar.app"
 
   # TunnelBar is not notarized yet (no Apple Developer ID): installing from this tap
   # means trusting it, so Gatekeeper's download quarantine is lifted.
-  postflight do
-    system_command "/usr/bin/xattr",
-                   args: ["-dr", "com.apple.quarantine", "#{appdir}/TunnelBar.app"]
+  postflight_steps do
+    run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{appdir}}/TunnelBar.app"]
   end
 
   uninstall quit: "io.github.gduprez.tunnelbar"
