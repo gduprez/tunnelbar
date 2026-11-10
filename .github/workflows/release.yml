@@ -1,8 +1,12 @@
 name: Release
 
 # release-please keeps a release pull request up to date from Conventional Commits.
-# Merging it tags vX.Y.Z and creates the GitHub release; the macOS job then attaches
-# the universal .dmg and updates the Homebrew tap.
+# Merging it tags vX.Y.Z and creates the GitHub release. The build jobs then make the
+# packages with a read-only token, and the publish job, which runs no build code, attaches
+# them to the release and updates the Homebrew tap.
+#
+# Release builds start from scratch (no cache): a cache written by an earlier CI run
+# could otherwise slip code into the published packages.
 
 on:
   push:
@@ -32,22 +36,20 @@ jobs:
     if: needs.release-please.outputs.created == 'true'
     runs-on: macos-latest
     permissions:
-      contents: write
+      contents: read
     env:
       VERSION: ${{ needs.release-please.outputs.version }}
-      TAG: ${{ needs.release-please.outputs.tag }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
-          cache: npm
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           toolchain: stable
           targets: aarch64-apple-darwin,x86_64-apple-darwin
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
       - run: npm ci
 
       # Developer ID signing and notarization turn on by adding these repository secrets;
@@ -73,12 +75,90 @@ jobs:
       - name: Build the universal app and disk image
         run: npx tauri build --target universal-apple-darwin --bundles app,dmg
 
-      - name: Attach the disk image to the release
+      - name: Name the disk image after the version
         run: |
+          mkdir packages
+          cp target/universal-apple-darwin/release/bundle/dmg/*.dmg \
+            "packages/TunnelBar_${VERSION}_universal.dmg"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-macos
+          path: packages/
+          if-no-files-found: error
+          retention-days: 1
+
+  linux:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.release-please.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the system libraries of Tauri
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          toolchain: stable
+      - run: npm ci
+      - name: Build the .deb and the AppImage
+        run: npx tauri build --bundles deb,appimage
+      - name: Name the packages after the version
+        run: |
+          mkdir packages
+          cp target/release/bundle/deb/*.deb "packages/TunnelBar_${VERSION}_amd64.deb"
+          cp target/release/bundle/appimage/*.AppImage \
+            "packages/TunnelBar_${VERSION}_amd64.AppImage"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-linux
+          path: packages/
+          if-no-files-found: error
+          retention-days: 1
+
+  # The only job with write access: it runs no dependency or build code.
+  publish:
+    needs: [release-please, macos, linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.release-please.outputs.version }}
+      TAG: ${{ needs.release-please.outputs.tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: packaging/homebrew
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-*
+          path: packages
+          merge-multiple: true
+
+      - name: Attach the packages to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd packages
           dmg="TunnelBar_${VERSION}_universal.dmg"
-          cp target/universal-apple-darwin/release/bundle/dmg/*.dmg "$dmg"
-          shasum -a 256 "$dmg" | tee "$dmg.sha256"
-          gh release upload "$TAG" "$dmg" "$dmg.sha256" --clobber
+          deb="TunnelBar_${VERSION}_amd64.deb"
+          appimage="TunnelBar_${VERSION}_amd64.AppImage"
+          for file in "$dmg" "$deb" "$appimage"; do
+            sha256sum "$file" | tee "$file.sha256"
+          done
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber \
+            "$dmg" "$dmg.sha256" "$deb" "$deb.sha256" "$appimage" "$appimage.sha256"
           echo "SHA256=$(cut -d' ' -f1 "$dmg.sha256")" >> "$GITHUB_ENV"
 
       - name: Update the Homebrew tap
@@ -104,40 +184,3 @@ jobs:
           git add Casks/tunnelbar.rb
           git commit -m "tunnelbar ${VERSION}"
           git -c http.https://github.com/.extraheader="$auth" push
-
-  linux:
-    needs: release-please
-    if: needs.release-please.outputs.created == 'true'
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: write
-    env:
-      VERSION: ${{ needs.release-please.outputs.version }}
-      TAG: ${{ needs.release-please.outputs.tag }}
-      GH_TOKEN: ${{ github.token }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install the system libraries of Tauri
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libwebkit2gtk-4.1-dev libgtk-3-dev \
-            libayatana-appindicator3-dev librsvg2-dev libssl-dev libxdo-dev
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
-      - run: npm ci
-      - name: Build the .deb and the AppImage
-        run: npx tauri build --bundles deb,appimage
-      - name: Attach the packages to the release
-        run: |
-          deb="TunnelBar_${VERSION}_amd64.deb"
-          appimage="TunnelBar_${VERSION}_amd64.AppImage"
-          cp target/release/bundle/deb/*.deb "$deb"
-          cp target/release/bundle/appimage/*.AppImage "$appimage"
-          for file in "$deb" "$appimage"; do shasum -a 256 "$file" | tee "$file.sha256"; done
-          gh release upload "$TAG" "$deb" "$deb.sha256" "$appimage" "$appimage.sha256" --clobber

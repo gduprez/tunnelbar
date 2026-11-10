@@ -1,11 +1,15 @@
 # Weekly dependency updates. Actions are pinned by commit SHA; Dependabot keeps those pins up
-# to date. Minor and patch updates are grouped to keep the pull requests few.
+# to date. Minor and patch updates are grouped to keep the pull requests few. New versions
+# wait a week (cooldown), long enough for a hijacked release to be caught and pulled;
+# security updates are not delayed.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: ci
 
@@ -13,6 +17,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: chore(deps)
     groups:
@@ -23,6 +29,8 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: chore(deps)
     ignore:

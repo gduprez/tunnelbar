@@ -153,8 +153,10 @@ Stopped ──start──► Connecting ──port open──► Up
 - **Local port already taken**: before each start, every local port is probed;
   one that already accepts connections belongs to another program, and the
   tunnel fails (`PortInUse`) without running `ssh`. Otherwise the probe would
-  answer for that program and show the tunnel up. Likewise, a
-  `bind …: Address already in use` line kills `ssh` and fails the tunnel:
+  answer for that program and show the tunnel up. Likewise, the exact OpenSSH
+  line `bind [address]:port: Address already in use`, for one of the tunnel's
+  local ports, kills `ssh` and fails the tunnel (the server's banner also
+  reaches stderr, so nothing looser counts):
   `ssh` keeps running when it binds `[::1]` but not `127.0.0.1` (or the
   reverse), since `ExitOnForwardFailure` applies only when no address could be
   bound.
@@ -282,8 +284,11 @@ On every pull request and push to `main` (all blocking):
 - `cargo deny` (licenses, advisories)
 - `cargo tauri build`
 
-On a `v*` tag: universal `.dmg`, GitHub Release with generated notes
-(`release-please`, SemVer), update of the `gduprez/homebrew-tap` cask.
+On a release (`release-please`, SemVer, generated notes): universal `.dmg`,
+`.deb` and AppImage with their SHA-256, update of the `gduprez/homebrew-tap`
+cask. The packages are built without cache and with a read-only token; a
+separate job, which runs no build code, is the only one allowed to attach them
+to the release and to push to the tap.
 
 `main` is protected: merge only with green CI. Issue and PR templates exist
 in English and French.

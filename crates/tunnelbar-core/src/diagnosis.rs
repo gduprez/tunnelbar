@@ -59,12 +59,27 @@ pub fn diagnose(stderr: &str, exit_code: Option<i32>) -> TunnelError {
 /// `ssh` reports it but keeps running when another address of the same forward was bound
 /// (`ExitOnForwardFailure` only applies when none was): the forward is then shared with
 /// another program, so the tunnel must not be considered up.
-pub fn local_bind_failure(line: &str) -> Option<TunnelError> {
-    (line.starts_with("bind ") && line.contains("Address already in use")).then(|| {
-        TunnelError::PortInUse {
-            port: port_in_bind_line(line),
-        }
-    })
+///
+/// The server's pre-authentication banner also reaches stderr, so only the exact OpenSSH
+/// line about one of the tunnel's own `ports` counts.
+pub fn local_bind_failure(line: &str, ports: &[u16]) -> Option<TunnelError> {
+    let address_and_port = line
+        .strip_prefix("bind ")?
+        .strip_suffix(": Address already in use")?;
+    let port = if let Some(rest) = address_and_port.strip_prefix('[') {
+        let (address, port) = rest.split_once("]:")?;
+        (!address.is_empty() && !address.contains(char::is_whitespace)).then_some(port)?
+    } else {
+        let (address, port) = address_and_port.split_once(" port ")?;
+        (!address.is_empty() && !address.contains(char::is_whitespace)).then_some(port)?
+    };
+    if port.is_empty() || !port.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let port: u16 = port.parse().ok()?;
+    ports
+        .contains(&port)
+        .then_some(TunnelError::PortInUse { port: Some(port) })
 }
 
 /// `bind [127.0.0.1]:54321: …` or `bind 127.0.0.1 port 54321: …`
@@ -149,25 +164,38 @@ mod tests {
 
     #[test]
     fn a_failed_local_bind_is_spotted_line_by_line() {
+        let ports = [15022, 1080, 8080];
         assert_eq!(
-            local_bind_failure("bind [127.0.0.1]:15022: Address already in use"),
+            local_bind_failure("bind [127.0.0.1]:15022: Address already in use", &ports),
             Some(PortInUse { port: Some(15022) })
         );
         assert_eq!(
-            local_bind_failure("bind [::1]:1080: Address already in use"),
+            local_bind_failure("bind [::1]:1080: Address already in use", &ports),
             Some(PortInUse { port: Some(1080) })
         );
         assert_eq!(
-            local_bind_failure("bind [127.0.0.1]:80: Permission denied"),
-            None,
-            "privileged ports are rejected by validation"
+            local_bind_failure("bind 127.0.0.1 port 8080: Address already in use", &ports),
+            Some(PortInUse { port: Some(8080) })
         );
-        assert_eq!(
-            local_bind_failure(
-                "Warning: Permanently added 'h' (ED25519) to the list of known hosts."
-            ),
-            None
-        );
+    }
+
+    #[test]
+    fn only_exact_bind_lines_for_the_tunnel_ports_count() {
+        let ports = [15022];
+        for line in [
+            // Not one of the tunnel's ports: a server banner imitating ssh.
+            "bind [127.0.0.1]:9999: Address already in use",
+            // Extra text around the message.
+            "Welcome! bind [127.0.0.1]:15022: Address already in use",
+            "bind [127.0.0.1]:15022: Address already in use (really)",
+            "bind [127.0.0.1]:15022 x: Address already in use",
+            "bind [127.0.0.1]:150222: Address already in use",
+            "bind [127.0.0.1]:: Address already in use",
+            "bind [127.0.0.1]:80: Permission denied",
+            "Warning: Permanently added 'h' (ED25519) to the list of known hosts.",
+        ] {
+            assert_eq!(local_bind_failure(line, &ports), None, "{line}");
+        }
     }
 
     #[test]

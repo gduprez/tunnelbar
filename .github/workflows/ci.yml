@@ -82,8 +82,11 @@ jobs:
       - run: cargo nextest run --workspace
       - name: Build the Linux packages
         run: npx tauri build --bundles deb,appimage
-      # Downloadable from the run page, to try a branch on a real Ubuntu desktop.
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      # Downloadable from the run page, to try a branch on a real Ubuntu desktop. Not for
+      # pull requests from forks: packages built from a stranger's code must not be offered
+      # for download on this repository.
+      - if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tunnelbar-linux-amd64
           path: |

@@ -162,9 +162,11 @@ Arrêté ──start──► Connexion ──port ouvert──► Actif
 - **Port local déjà pris** : avant chaque démarrage, chaque port local est
   testé ; s'il accepte déjà des connexions, il appartient à un autre programme
   et le tunnel échoue (`PortInUse`) sans lancer `ssh`. Sinon, le test de port
-  répondrait pour ce programme et afficherait le tunnel actif. De même, une
-  ligne `bind …: Address already in use` arrête `ssh` et fait échouer le
-  tunnel : `ssh` continue de tourner s'il écoute sur `[::1]` mais pas sur
+  répondrait pour ce programme et afficherait le tunnel actif. De même, la
+  ligne exacte d'OpenSSH `bind [adresse]:port: Address already in use`, pour
+  un des ports locaux du tunnel, arrête `ssh` et fait échouer le tunnel (la
+  bannière du serveur arrive aussi sur stderr : rien de plus vague ne compte).
+  En effet, `ssh` continue de tourner s'il écoute sur `[::1]` mais pas sur
   `127.0.0.1` (ou l'inverse), car `ExitOnForwardFailure` ne joue que si aucune
   adresse n'a pu être ouverte.
 - **Reconnexion** (`auto_reconnect = true` par défaut) : délai exponentiel
@@ -297,8 +299,11 @@ Sur chaque pull request et chaque push sur `main` (tout est bloquant) :
 - `cargo deny` (licences, vulnérabilités)
 - `cargo tauri build`
 
-Sur un tag `v*` : `.dmg` universel, GitHub Release avec notes générées
-(`release-please`, SemVer), mise à jour du cask dans `gduprez/homebrew-tap`.
+À chaque version (`release-please`, SemVer, notes générées) : `.dmg`
+universel, `.deb` et AppImage avec leur SHA-256, mise à jour du cask dans
+`gduprez/homebrew-tap`. Les paquets sont construits sans cache et avec un jeton
+en lecture seule ; un job séparé, qui n'exécute aucun code de build, est le
+seul autorisé à les joindre à la release et à pousser dans le tap.
 
 `main` est protégée : fusion uniquement avec une CI au vert. Les modèles
 d'issues et de PR existent en anglais et en français.

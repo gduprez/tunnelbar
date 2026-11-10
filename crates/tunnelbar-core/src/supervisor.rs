@@ -210,7 +210,7 @@ impl<S: ProcessSpawner, P: PortProber> Supervisor<S, P> {
                     self.apply(Event::Exited { error }).await;
                 }
                 Wake::Line(line) => {
-                    let failure = local_bind_failure(&line);
+                    let failure = local_bind_failure(&line, &self.local_ports);
                     self.record(line);
                     self.publish();
                     if let Some(error) = failure {
