@@ -130,6 +130,8 @@ jobs:
   publish:
     needs: [release-please, macos, linux]
     runs-on: ubuntu-latest
+    # HOMEBREW_TAP_TOKEN lives in this environment, which only main can use.
+    environment: release
     permissions:
       contents: write
     env:
