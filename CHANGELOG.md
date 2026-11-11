@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/gduprez/tunnelbar/compare/v0.3.0...v0.3.1) (2026-11-11)
+
+
+### Bug Fixes
+
+* **deps:** override minimatch to 11.0.3 (GHSA-g3hv-75wg-m249) ([#5](https://github.com/gduprez/tunnelbar/issues/5)) ([17b8e04](https://github.com/gduprez/tunnelbar/commit/17b8e0439f9b74f56c677209cd573b0ef1d9dc2c))
+
 ## [0.3.0](https://github.com/gduprez/tunnelbar/compare/v0.2.1...v0.3.0) (2026-11-10)
 
 
