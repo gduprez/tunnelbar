@@ -31,6 +31,33 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
+  # release-please opens its pull request with GITHUB_TOKEN, which starts no workflow, so
+  # main's required checks would never report on it. A workflow dispatch is the exception:
+  # run CI on the release branch, and the checks land on the pull request's commit.
+  release-pr-ci:
+    needs: release-please
+    if: needs.release-please.outputs.created != 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      pull-requests: read
+    steps:
+      - name: Run CI on the open release pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branches="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+            --author app/github-actions --label 'autorelease: pending' \
+            --json headRefName --jq '.[].headRefName')"
+          for branch in $branches; do
+            case "$branch" in
+              release-please--*)
+                echo "Running CI on $branch"
+                gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$branch"
+                ;;
+            esac
+          done
+
   macos:
     needs: release-please
     if: needs.release-please.outputs.created == 'true'
