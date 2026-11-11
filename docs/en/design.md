@@ -289,6 +289,9 @@ On a release (`release-please`, SemVer, generated notes): universal `.dmg`,
 cask. The packages are built without cache and with a read-only token; a
 separate job, which runs no build code, is the only one allowed to attach them
 to the release and to push to the tap.
+release-please opens its pull request with the built-in token, which starts no
+workflow; the release workflow therefore dispatches CI on that branch, so that
+the required checks of `main` report on it.
 
 `main` is protected: merge only with green CI. Issue and PR templates exist
 in English and French.

@@ -304,6 +304,9 @@ universel, `.deb` et AppImage avec leur SHA-256, mise à jour du cask dans
 `gduprez/homebrew-tap`. Les paquets sont construits sans cache et avec un jeton
 en lecture seule ; un job séparé, qui n'exécute aucun code de build, est le
 seul autorisé à les joindre à la release et à pousser dans le tap.
+release-please ouvre sa PR avec le jeton intégré, qui ne déclenche aucun
+workflow : le workflow de release lance donc la CI sur cette branche, pour que
+les contrôles exigés sur `main` s'y appliquent.
 
 `main` est protégée : fusion uniquement avec une CI au vert. Les modèles
 d'issues et de PR existent en anglais et en français.
