@@ -101,7 +101,9 @@ Keeping TunnelBar free of known vulnerabilities is part of every change:
   security audit of the changes since the previous release is required: run
   the `/security-audit` Claude Code skill on `git diff <previous tag>..main`
   (or review it by hand). Critical, high and medium findings are fixed before
-  the release; low ones are fixed or tracked in an issue.
+  the release; low ones are fixed or tracked in an issue. GitHub holds the CI
+  of that pull request until the owner clicks "Approve and run workflows" on
+  it; it merges once the checks are green.
 - Rules that every change keeps: `ssh` is never run through a shell and every
   user value is validated by the core; no `{@html}`, `innerHTML` or remote
   resource in the UI; the CSP and the Tauri capabilities only get stricter;
