@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/gduprez/tunnelbar/compare/v0.3.1...v0.3.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **deps:** update cookie to 0.18.3 and url to 2.5.9 ([#12](https://github.com/gduprez/tunnelbar/issues/12)) ([1e8f895](https://github.com/gduprez/tunnelbar/commit/1e8f895b68f87a57639e6e63e3a1c6014509abbd))
+
 ## [0.3.1](https://github.com/gduprez/tunnelbar/compare/v0.3.0...v0.3.1) (2026-11-11)
 
 
