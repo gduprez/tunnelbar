@@ -50,7 +50,7 @@ jobs:
           toolchain: stable
           components: rustfmt
       - run: cargo fmt --all --check
-      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
+      - uses: EmbarkStudios/cargo-deny-action@70f81531115945ba6eb6b941ec9d39d063438eb9 # v2
 
   # Ubuntu port (docs/fr/plan-ubuntu.md): the reference architecture is amd64.
   ubuntu:
