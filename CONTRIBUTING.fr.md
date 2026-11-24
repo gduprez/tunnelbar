@@ -107,6 +107,9 @@ changement :
   `/security-audit` sur `git diff <tag précédent>..main` (ou relisez à la
   main). Les points critiques, hauts et moyens sont corrigés avant la
   publication ; les points bas sont corrigés ou suivis dans une issue.
+  GitHub retient la CI de cette PR jusqu'à ce que le propriétaire clique sur
+  « Approve and run workflows » ; elle se fusionne une fois les contrôles au
+  vert.
 - Règles que tout changement respecte : `ssh` n'est jamais lancé via un shell
   et chaque valeur saisie est validée par le core ; pas de `{@html}`,
   d'`innerHTML` ni de ressource distante dans l'interface ; la CSP et les
